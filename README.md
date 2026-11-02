@@ -334,7 +334,7 @@ sudo chmod 600 /opt/college-app/.env
 sudo nano /opt/college-app/.env
 ```
 
-Set the RDS hostname, matching database username/password, S3 bucket, a random Flask secret (`openssl rand -hex 32`), and a unique initial admin email/password. The EC2 instance profile provides S3 credentials; do not add static AWS keys. Set `SESSION_COOKIE_SECURE=true` when serving HTTPS. For a temporary HTTP-only demo, `false` permits browser session cookies over HTTP and must not be used with real or sensitive data.
+Set the RDS hostname, matching database username/password, S3 bucket, a random Flask secret (`openssl rand -hex 32`), and a unique initial admin email/password. The EC2 instance profile provides S3 credentials; do not add static AWS keys. The example sets `SESSION_COOKIE_SECURE=false` for the temporary HTTP demo so browsers send the session cookie. Set it to `true` when serving HTTPS; HTTP should not be used with real or sensitive data.
 
 Run the deployment script from the cloned repository on EC2:
 
