@@ -1,0 +1,22 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block breadcrumb %}Admin &rsaquo; Dashboard{% endblock %}
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+  <div><h4 class="mb-1"><i class="bi bi-speedometer2 me-2 text-primary"></i>Admin Dashboard</h4><p class="text-muted mb-0 small">Welcome, {{ current_user.get_full_name() }}.</p></div>
+  <div class="d-flex gap-2"><a href="{{ url_for('admin.add_student') }}" class="btn btn-outline-primary">Add Student</a><a href="{{ url_for('admin.add_faculty') }}" class="btn btn-primary">Add Faculty</a></div>
+</div>
+<div class="row g-3 mb-4">
+  {% for label, value, icon in [('Students', total_students, 'bi-mortarboard'), ('Faculty', total_faculty, 'bi-person-workspace'), ('Departments', total_departments, 'bi-building'), ('Subjects', total_subjects, 'bi-book')] %}
+  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body d-flex align-items-center gap-3"><i class="bi {{ icon }} fs-2 text-primary"></i><div><div class="fs-3 fw-bold">{{ value }}</div><div class="text-muted">{{ label }}</div></div></div></div></div>
+  {% endfor %}
+</div>
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header bg-white d-flex justify-content-between"><strong>Recent student registrations</strong><a href="{{ url_for('admin.students') }}">View all</a></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Status</th></tr></thead><tbody>
+  {% for student in recent_registrations %}<tr><td>{{ student.user.get_full_name() if student.user else '—' }}</td><td>{{ student.student_roll_number }}</td><td>{{ student.department.department_name if student.department else '—' }}</td><td>{{ student.academic_status|title }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No students registered yet.</td></tr>{% endfor %}
+  </tbody></table></div></div></div>
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header bg-white"><strong>Upcoming examinations</strong></div><div class="list-group list-group-flush">
+  {% for exam in upcoming_exams %}<div class="list-group-item"><div class="fw-semibold">{{ exam.title }}</div><small class="text-muted">{{ exam.subject.subject_name if exam.subject else '—' }} · {{ exam.start_time.strftime('%d %b %Y %H:%M') if exam.start_time else 'Date not set' }}</small></div>{% else %}<div class="list-group-item text-muted">No upcoming examinations.</div>{% endfor %}
+  </div></div></div>
+</div>
+{% endblock %}

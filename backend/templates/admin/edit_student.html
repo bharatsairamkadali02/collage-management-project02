@@ -1,0 +1,19 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Edit Student{% endblock %}
+{% block content %}
+<div class="container-fluid py-4"><h1 class="h3 mb-4">Edit student</h1>
+  <form method="post" class="card card-body">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label">First name</label><input class="form-control" name="first_name" value="{{ student.user.first_name }}" required></div>
+      <div class="col-md-6"><label class="form-label">Last name</label><input class="form-control" name="last_name" value="{{ student.user.last_name }}" required></div>
+      <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="{{ student.user.phone or '' }}"></div>
+      <div class="col-md-6"><label class="form-label">Date of birth</label><input class="form-control" type="date" name="date_of_birth" value="{{ student.date_of_birth.isoformat() if student.date_of_birth else '' }}"></div>
+      <div class="col-md-6"><label class="form-label">Department</label><select class="form-select" name="department_id">{% for d in departments %}<option value="{{ d.id }}" {% if student.department_id == d.id %}selected{% endif %}>{{ d.department_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-6"><label class="form-label">Class section</label><select class="form-select" name="class_section_id"><option value="">Unassigned</option>{% for section in class_sections %}<option value="{{ section.id }}" {% if student.class_section_id == section.id %}selected{% endif %}>{{ section.section_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-6"><label class="form-label">Status</label><select class="form-select" name="academic_status">{% for status in ['active','suspended','graduated','dropped'] %}<option value="{{ status }}" {% if student.academic_status == status %}selected{% endif %}>{{ status|title }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="mt-4"><button class="btn btn-primary" type="submit">Save changes</button> <a class="btn btn-outline-secondary" href="{{ url_for('admin.students') }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

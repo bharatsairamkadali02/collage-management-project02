@@ -1,0 +1,22 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Class Sections{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <h1 class="h3 mb-4">Class sections</h1>
+  <div class="card mb-4"><div class="card-body">
+    <h2 class="h5">Add a section</h2>
+    <form method="post" action="{{ url_for('admin.add_class_section') }}" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-3"><label class="form-label">Section name</label><input class="form-control" name="name" required maxlength="30"></div>
+      <div class="col-md-3"><label class="form-label">Department</label><select class="form-select" name="department_id" required>{% for d in departments %}<option value="{{ d.id }}">{{ d.department_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label">Semester</label><select class="form-select" name="semester_id" required>{% for s in semesters %}<option value="{{ s.id }}">{{ s.department.department_name }} · {{ s.academic_year.year_label }} · {{ s.semester_number }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label">Academic year</label><select class="form-select" name="academic_year_id" required>{% for y in academic_years %}<option value="{{ y.id }}">{{ y.year_label }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label">Capacity</label><input class="form-control" type="number" name="max_students" min="1" value="60"></div>
+      <div class="col-12"><button class="btn btn-primary" type="submit">Add section</button></div>
+    </form>
+  </div></div>
+  <div class="card"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Section</th><th>Department</th><th>Semester</th><th>Academic year</th><th>Capacity</th></tr></thead><tbody>
+    {% for section in class_sections %}<tr><td>{{ section.section_name }}</td><td>{{ section.department.department_name }}</td><td>{{ section.semester.semester_number }}</td><td>{{ section.academic_year.year_label }}</td><td>{{ section.max_students }}</td></tr>{% else %}<tr><td colspan="5" class="text-center py-4">No class sections yet.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+</div>
+{% endblock %}

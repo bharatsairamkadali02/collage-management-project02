@@ -1,0 +1,18 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Edit Faculty{% endblock %}
+{% block content %}
+<div class="container-fluid py-4"><h1 class="h3 mb-4">Edit faculty member</h1>
+  <form method="post" class="card card-body">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label">First name</label><input class="form-control" name="first_name" value="{{ faculty_member.user.first_name }}" required></div>
+      <div class="col-md-6"><label class="form-label">Last name</label><input class="form-control" name="last_name" value="{{ faculty_member.user.last_name }}" required></div>
+      <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="{{ faculty_member.user.phone or '' }}"></div>
+      <div class="col-md-6"><label class="form-label">Department</label><select class="form-select" name="department_id">{% for d in departments %}<option value="{{ d.id }}" {% if faculty_member.department_id == d.id %}selected{% endif %}>{{ d.department_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-6"><label class="form-label">Designation</label><input class="form-control" name="designation" value="{{ faculty_member.designation or '' }}"></div>
+      <div class="col-md-6"><label class="form-label">Qualification</label><input class="form-control" name="qualification" value="{{ faculty_member.qualification or '' }}"></div>
+    </div>
+    <div class="mt-4"><button class="btn btn-primary" type="submit">Save changes</button> <a class="btn btn-outline-secondary" href="{{ url_for('admin.faculty') }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "faculty/base_faculty.html" %}
+{% block title %}Exam Attempts{% endblock %}
+{% block content %}
+<div class="container-fluid py-4"><h1 class="h3 mb-3">Attempts: {{ exam.title }}</h1>
+  <div class="card"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Student</th><th>Attempt</th><th>Started</th><th>Submitted</th><th>Score</th><th>Status</th></tr></thead><tbody>
+    {% for attempt in attempts %}<tr><td>{{ attempt.student.user.get_full_name() if attempt.student and attempt.student.user else 'Student' }}</td><td>{{ attempt.attempt_number }}</td><td>{{ attempt.started_at }}</td><td>{{ attempt.submitted_at or 'In progress' }}</td><td>{{ attempt.score_obtained if attempt.score_obtained is not none else '—' }}</td><td>{{ attempt.status|title }}</td></tr>{% else %}<tr><td colspan="6" class="text-center py-4">No attempts yet.</td></tr>{% endfor %}
+  </tbody></table></div></div></div>
+{% endblock %}

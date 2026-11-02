@@ -1,0 +1,21 @@
+# Secrets and local environment
+.env
+**/.env
+terraform/terraform.tfvars
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/*.tfstate*
+terraform/crash.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Local/editor files
+.vscode/
+.idea/
+.DS_Store
