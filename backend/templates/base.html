@@ -223,7 +223,7 @@
                     <i class="bi bi-info-circle text-primary mt-1"></i>
                     <div>
                       <div class="fw-semibold small">{{ notif.title }}</div>
-                      <div class="text-muted" style="font-size:.75rem;">{{ notif.created_at | timeago }}</div>
+                      <div class="text-muted" style="font-size:.75rem;">{{ notif.created_at.strftime('%d %b %Y %H:%M') if notif.created_at else '' }}</div>
                     </div>
                   </div>
                 </a>
