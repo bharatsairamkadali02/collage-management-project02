@@ -8,9 +8,9 @@
     <form method="post" action="{{ url_for('admin.add_class_section') }}" class="row g-3">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="col-md-3"><label class="form-label">Section name</label><input class="form-control" name="name" required maxlength="30"></div>
-      <div class="col-md-3"><label class="form-label">Department</label><select class="form-select" name="department_id" required>{% for d in departments %}<option value="{{ d.id }}">{{ d.department_name }}</option>{% endfor %}</select></div>
-      <div class="col-md-3"><label class="form-label">Semester</label><select class="form-select" name="semester_id" required>{% for s in semesters %}<option value="{{ s.id }}">{{ s.department.department_name }} · {{ s.academic_year.year_label }} · {{ s.semester_number }}</option>{% endfor %}</select></div>
-      <div class="col-md-3"><label class="form-label">Academic year</label><select class="form-select" name="academic_year_id" required>{% for y in academic_years %}<option value="{{ y.id }}">{{ y.year_label }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label">Department</label><select class="form-select" name="department_id" id="sectionDepartmentSelect" required><option value="">Select department...</option>{% for d in departments %}<option value="{{ d.id }}">{{ d.department_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label">Semester</label><select class="form-select" name="semester_id" id="sectionSemesterSelect" required disabled><option value="">Select department and year first</option>{% for s in semesters %}<option value="{{ s.id }}" data-department="{{ s.department_id }}" data-year="{{ s.academic_year_id }}" hidden disabled>Semester {{ s.semester_number }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label">Academic year</label><select class="form-select" name="academic_year_id" id="sectionAcademicYearSelect" required><option value="">Select academic year...</option>{% for y in academic_years %}<option value="{{ y.id }}">{{ y.year_label }}</option>{% endfor %}</select></div>
       <div class="col-md-3"><label class="form-label">Capacity</label><input class="form-control" type="number" name="max_students" min="1" value="60"></div>
       <div class="col-12"><button class="btn btn-primary" type="submit">Add section</button></div>
     </form>
@@ -19,4 +19,34 @@
     {% for section in class_sections %}<tr><td>{{ section.section_name }}</td><td>{{ section.department.department_name }}</td><td>{{ section.semester.semester_number }}</td><td>{{ section.academic_year.year_label }}</td><td>{{ section.max_students }}</td></tr>{% else %}<tr><td colspan="5" class="text-center py-4">No class sections yet.</td></tr>{% endfor %}
   </tbody></table></div></div>
 </div>
+<script>
+const sectionDepartmentSelect = document.getElementById('sectionDepartmentSelect');
+const sectionAcademicYearSelect = document.getElementById('sectionAcademicYearSelect');
+const sectionSemesterSelect = document.getElementById('sectionSemesterSelect');
+
+function updateAvailableSemesters() {
+  const departmentId = sectionDepartmentSelect.value;
+  const yearId = sectionAcademicYearSelect.value;
+  let available = 0;
+  sectionSemesterSelect.value = '';
+
+  Array.from(sectionSemesterSelect.options).slice(1).forEach(option => {
+    const matches = Boolean(departmentId && yearId)
+      && option.dataset.department === departmentId
+      && option.dataset.year === yearId;
+    option.hidden = !matches;
+    option.disabled = !matches;
+    if (matches) available += 1;
+  });
+
+  sectionSemesterSelect.options[0].textContent = !departmentId || !yearId
+    ? 'Select department and year first'
+    : (available ? 'Select semester...' : 'No semesters available');
+  sectionSemesterSelect.disabled = available === 0;
+}
+
+sectionDepartmentSelect.addEventListener('change', updateAvailableSemesters);
+sectionAcademicYearSelect.addEventListener('change', updateAvailableSemesters);
+updateAvailableSemesters();
+</script>
 {% endblock %}

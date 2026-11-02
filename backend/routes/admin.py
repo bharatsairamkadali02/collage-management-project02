@@ -651,7 +651,17 @@ def add_semester():
 def attendance():
     class_sections = ClassSection.query.order_by(ClassSection.name).all()
     subjects = Subject.query.filter_by(is_active=True).order_by(Subject.name).all()
-    return render_template('admin/attendance.html', class_sections=class_sections, subjects=subjects)
+    departments = Department.query.order_by(Department.name).all()
+    academic_years = AcademicYear.query.order_by(AcademicYear.start_date.desc()).all()
+    semesters = Semester.query.order_by(Semester.semester_number).all()
+    return render_template(
+        'admin/attendance.html',
+        class_sections=class_sections,
+        subjects=subjects,
+        departments=departments,
+        academic_years=academic_years,
+        semesters=semesters,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -959,13 +969,36 @@ def class_sections():
 def add_class_section():
     data = request.get_json(silent=True) or request.form
     name = (data.get('name') or '').strip()
-    department_id = int(data.get('department_id', 0))
-    semester_id = int(data.get('semester_id', 0))
-    academic_year_id = int(data.get('academic_year_id', 0))
-    max_students = int(data.get('max_students', 60))
+    try:
+        if request.is_json:
+            department_id = int(data.get('department_id') or 0)
+            semester_id = int(data.get('semester_id') or 0)
+            academic_year_id = int(data.get('academic_year_id') or 0)
+            max_students = int(data.get('max_students') or 60)
+        else:
+            department_id = data.get('department_id', 0, type=int)
+            semester_id = data.get('semester_id', 0, type=int)
+            academic_year_id = data.get('academic_year_id', 0, type=int)
+            max_students = data.get('max_students', 60, type=int)
+    except (TypeError, ValueError):
+        department_id, semester_id, academic_year_id = 0, 0, 0
+        max_students = 0
 
-    if not all([name, department_id, semester_id, academic_year_id]):
-        return jsonify({'error': 'name, department_id, semester_id, and academic_year_id are required.'}), 400
+    message = None
+    if not all([name, department_id, semester_id, academic_year_id]) or max_students < 1:
+        message = 'Section name, department, semester, academic year, and valid capacity are required.'
+    else:
+        semester = Semester.query.get(semester_id)
+        if not Department.query.get(department_id) or not AcademicYear.query.get(academic_year_id):
+            message = 'Select a valid department and academic year.'
+        elif not semester or semester.department_id != department_id or semester.academic_year_id != academic_year_id:
+            message = 'Choose a semester that belongs to the selected department and academic year.'
+
+    if message:
+        if request.is_json:
+            return jsonify({'error': message}), 400
+        flash(message, 'danger')
+        return redirect(url_for('admin.class_sections'))
 
     section = ClassSection(
         name=name,
@@ -976,7 +1009,10 @@ def add_class_section():
     )
     db.session.add(section)
     db.session.commit()
-    return jsonify({'message': 'Class section added.', 'class_section_id': section.id}), 201
+    if request.is_json:
+        return jsonify({'message': 'Class section added.', 'class_section_id': section.id}), 201
+    flash(f'Section {name} added.', 'success')
+    return redirect(url_for('admin.class_sections'))
 
 
 # ---------------------------------------------------------------------------

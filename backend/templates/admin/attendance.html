@@ -13,26 +13,53 @@
 <div class="card mb-4 border-0 shadow-sm">
   <div class="card-body">
     <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">Class Section</label>
-        <select id="classSectionSelect" class="form-select">
-          <option value="">Select Section...</option>
-          {% for cs in class_sections %}
-          <option value="{{ cs.id }}">{{ cs.section_name }} ({{ cs.department.department_code if cs.department else '' }})</option>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">Academic Year</label>
+        <select id="attendanceYearSelect" class="form-select">
+          <option value="">Select Year...</option>
+          {% for year in academic_years %}
+          <option value="{{ year.id }}">{{ year.year_label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-6 col-lg-3">
+        <label class="form-label fw-semibold">Department</label>
+        <select id="attendanceDepartmentSelect" class="form-select">
+          <option value="">Select Department...</option>
+          {% for department in departments %}
+          <option value="{{ department.id }}">{{ department.department_name }} ({{ department.department_code }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">Semester</label>
+        <select id="attendanceSemesterSelect" class="form-select" disabled>
+          <option value="">Select year and department first</option>
+          {% for semester in semesters %}
+          <option value="{{ semester.id }}" data-year="{{ semester.academic_year_id }}" data-department="{{ semester.department_id }}" hidden disabled>Semester {{ semester.semester_number }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">Class Section</label>
+        <select id="classSectionSelect" class="form-select" disabled>
+          <option value="">Select semester first</option>
+          {% for cs in class_sections %}
+          <option value="{{ cs.id }}" data-year="{{ cs.academic_year_id }}" data-department="{{ cs.department_id }}" data-semester="{{ cs.semester_id }}" hidden disabled>Section {{ cs.section_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-3">
         <label class="form-label fw-semibold">Subject</label>
-        <select id="subjectSelect" class="form-select">
+        <select id="subjectSelect" class="form-select" disabled>
           <option value="">All Subjects</option>
           {% for s in subjects %}
-          <option value="{{ s.id }}">{{ s.subject_name }} ({{ s.subject_code }})</option>
+          <option value="{{ s.id }}" data-department="{{ s.department_id }}" data-semester="{{ s.semester_id }}" hidden disabled>{{ s.subject_name }} ({{ s.subject_code }})</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4 d-flex align-items-end">
-        <button id="loadReportBtn" class="btn btn-primary w-100" onclick="loadClassReport()">
+      <div class="col-12 d-flex justify-content-end">
+        <button id="loadReportBtn" class="btn btn-primary" onclick="loadClassReport()" disabled>
           <i class="bi bi-filter me-1"></i> Generate Class Attendance Report
         </button>
       </div>
@@ -74,16 +101,93 @@
 </div>
 
 <script>
+const attendanceYearSelect = document.getElementById('attendanceYearSelect');
+const attendanceDepartmentSelect = document.getElementById('attendanceDepartmentSelect');
+const attendanceSemesterSelect = document.getElementById('attendanceSemesterSelect');
+const attendanceSectionSelect = document.getElementById('classSectionSelect');
+const attendanceSubjectSelect = document.getElementById('subjectSelect');
+const loadReportButton = document.getElementById('loadReportBtn');
+
+function updateAttendanceSemesters() {
+  const yearId = attendanceYearSelect.value;
+  const departmentId = attendanceDepartmentSelect.value;
+  let available = 0;
+  attendanceSemesterSelect.value = '';
+
+  Array.from(attendanceSemesterSelect.options).slice(1).forEach(option => {
+    const matches = Boolean(yearId && departmentId)
+      && option.dataset.year === yearId
+      && option.dataset.department === departmentId;
+    option.hidden = !matches;
+    option.disabled = !matches;
+    if (matches) available += 1;
+  });
+
+  attendanceSemesterSelect.options[0].textContent = !yearId || !departmentId
+    ? 'Select year and department first'
+    : (available ? 'Select Semester...' : 'No semesters available');
+  attendanceSemesterSelect.disabled = available === 0;
+  updateAttendanceSectionsAndSubjects();
+}
+
+function updateAttendanceSectionsAndSubjects() {
+  const yearId = attendanceYearSelect.value;
+  const departmentId = attendanceDepartmentSelect.value;
+  const semesterId = attendanceSemesterSelect.value;
+  let sectionCount = 0;
+  let subjectCount = 0;
+  attendanceSectionSelect.value = '';
+  attendanceSubjectSelect.value = '';
+
+  Array.from(attendanceSectionSelect.options).slice(1).forEach(option => {
+    const matches = Boolean(yearId && departmentId && semesterId)
+      && option.dataset.year === yearId
+      && option.dataset.department === departmentId
+      && option.dataset.semester === semesterId;
+    option.hidden = !matches;
+    option.disabled = !matches;
+    if (matches) sectionCount += 1;
+  });
+  attendanceSectionSelect.options[0].textContent = !semesterId
+    ? 'Select semester first'
+    : (sectionCount ? 'Select Section...' : 'No sections available');
+  attendanceSectionSelect.disabled = sectionCount === 0;
+
+  Array.from(attendanceSubjectSelect.options).slice(1).forEach(option => {
+    const matches = Boolean(departmentId && semesterId)
+      && option.dataset.department === departmentId
+      && option.dataset.semester === semesterId;
+    option.hidden = !matches;
+    option.disabled = !matches;
+    if (matches) subjectCount += 1;
+  });
+  attendanceSubjectSelect.options[0].textContent = subjectCount
+    ? 'All Subjects'
+    : (semesterId ? 'No subjects for this semester' : 'Select semester first');
+  attendanceSubjectSelect.disabled = subjectCount === 0;
+  loadReportButton.disabled = !attendanceSectionSelect.value;
+}
+
+attendanceYearSelect.addEventListener('change', updateAttendanceSemesters);
+attendanceDepartmentSelect.addEventListener('change', updateAttendanceSemesters);
+attendanceSemesterSelect.addEventListener('change', updateAttendanceSectionsAndSubjects);
+attendanceSectionSelect.addEventListener('change', () => {
+  loadReportButton.disabled = !attendanceSectionSelect.value;
+});
+updateAttendanceSemesters();
+
 function loadClassReport() {
   const classId = document.getElementById('classSectionSelect').value;
   const subjectId = document.getElementById('subjectSelect').value;
   if (!classId) {
-    alert('Please select a class section.');
+    alert('Please select a year, department, semester, and class section.');
     return;
   }
 
-  let url = `/attendance/report/class/${classId}`;
-  if (subjectId) url += `?subject_id=${subjectId}`;
+  const params = new URLSearchParams();
+  if (subjectId) params.set('subject_id', subjectId);
+  const query = params.toString();
+  const url = `/attendance/report/class/${classId}${query ? `?${query}` : ''}`;
 
   const tbody = document.getElementById('attendanceReportBody');
   tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading attendance report...</td></tr>';
