@@ -30,15 +30,21 @@ def _redirect_by_role(user):
 # ---------------------------------------------------------------------------
 # GET/POST /auth/login
 # ---------------------------------------------------------------------------
-@auth.route('/login', methods=['GET', 'POST'])
-def login():
+@auth.route('/login', defaults={'role': None}, methods=['GET', 'POST'])
+@auth.route('/login/<role>', methods=['GET', 'POST'])
+def login(role=None):
     """Login form. Validates credentials and redirects by role."""
-    requested_role = request.values.get('role', '').strip().lower()
+    requested_role = (role or request.values.get('role', '')).strip().lower()
     if requested_role not in {'admin', 'faculty', 'student'}:
         requested_role = ''
 
     if current_user.is_authenticated:
         return _redirect_by_role(current_user)
+
+    if not requested_role:
+        if request.method == 'POST':
+            flash('Choose Admin, Faculty, or Student before signing in.', 'info')
+        return render_template('auth/login-options.html')
 
     if request.method == 'POST':
         # Basic CSRF token validation (assumes WTForms / Flask-WTF middleware)

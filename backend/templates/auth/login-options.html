@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose your portal | EduManage Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(130deg,#102c25e8,#102c2599),url('{{ url_for('static', filename='img/campus-bg.png') }}') center/cover fixed;display:grid;place-items:center;padding:28px;font-family:var(--font-body,Manrope,sans-serif);color:#1d2420}.chooser{width:min(100%,1000px);background:#fbfaf6f2;border:1px solid #ffffff9c;border-radius:22px;padding:clamp(28px,5vw,54px);box-shadow:0 24px 70px #071b1760;backdrop-filter:blur(12px)}.brand{display:flex;align-items:center;justify-content:center;gap:12px;color:#12352d;font:700 22px Fraunces,Georgia,serif}.brand-icon{width:48px;height:48px;border-radius:14px;background:#12352d;color:#c08a2e;display:grid;place-items:center;font-size:23px}.eyebrow{text-align:center;color:#9b6b20;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:800;margin-top:30px}.chooser h1{text-align:center;font:600 clamp(32px,5vw,46px)/1.1 Fraunces,Georgia,serif;color:#12352d;margin:9px 0}.intro{text-align:center;color:#68736c;margin:0 auto 30px;max-width:540px}.options{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.option{background:#fff;border:1px solid #e8e2d6;border-radius:15px;padding:24px 20px;color:#12352d;transition:.2s;display:flex;flex-direction:column;align-items:flex-start;min-height:198px}.option:hover{transform:translateY(-4px);border-color:#c08a2e;box-shadow:0 12px 28px #12352d18;color:#12352d}.option-icon{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;background:#f5ead3;color:#96691e;font-size:21px;margin-bottom:18px}.option strong{font-size:17px}.option small{color:#68736c;margin-top:5px}.option .go{margin-top:auto;padding-top:18px;color:#a26f1e;font-size:13px;font-weight:800}.back{text-align:center;margin:25px 0 0}.back a{color:#49645a;font-size:13px;font-weight:700}.back a:hover{color:#a26f1e}@media(max-width:700px){.options{grid-template-columns:1fr}.option{min-height:145px}.option-icon{margin-bottom:12px}}
+  </style>
+</head>
+<body>
+  <main class="chooser">
+    <div class="brand"><span class="brand-icon"><i class="bi bi-mortarboard-fill"></i></span><span>EduManage Pro</span></div>
+    <div class="eyebrow">College portal</div>
+    <h1>Choose your sign-in</h1>
+    <p class="intro">Select the portal for your role. Each sign-in is checked against the matching account type.</p>
+    <div class="options">
+      <a class="option" href="{{ url_for('auth.login', role='admin') }}"><span class="option-icon"><i class="bi bi-shield-lock"></i></span><strong>Admin Login</strong><small>College administration and portal management</small><span class="go">Continue as Admin <i class="bi bi-arrow-right"></i></span></a>
+      <a class="option" href="{{ url_for('auth.login', role='faculty') }}"><span class="option-icon"><i class="bi bi-person-workspace"></i></span><strong>Faculty Login</strong><small>Teaching, attendance, exams, and course tools</small><span class="go">Continue as Faculty <i class="bi bi-arrow-right"></i></span></a>
+      <a class="option" href="{{ url_for('auth.login', role='student') }}"><span class="option-icon"><i class="bi bi-mortarboard"></i></span><strong>Student Login</strong><small>Student academics, results, and campus services</small><span class="go">Continue as Student <i class="bi bi-arrow-right"></i></span></a>
+    </div>
+    <p class="back"><a href="{{ url_for('index') }}"><i class="bi bi-arrow-left"></i> Back to Home</a></p>
+  </main>
+</body>
+</html>

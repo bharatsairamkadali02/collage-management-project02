@@ -73,7 +73,7 @@
       {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('auth.login', role=requested_role) if requested_role else url_for('auth.login') }}">
+    <form method="POST" action="{{ url_for('auth.login', role=requested_role) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% if requested_role %}<input type="hidden" name="role" value="{{ requested_role }}">{% endif %}
 
