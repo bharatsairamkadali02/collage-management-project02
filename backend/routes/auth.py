@@ -44,7 +44,7 @@ def login(role=None):
     if not requested_role:
         if request.method == 'POST':
             flash('Choose Admin, Faculty, or Student before signing in.', 'info')
-        return render_template('auth/login-options.html')
+        return render_template('auth/login.html', requested_role='student')
 
     if request.method == 'POST':
         # Basic CSRF token validation (assumes WTForms / Flask-WTF middleware)

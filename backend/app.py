@@ -153,7 +153,7 @@ def _register_blueprints(app: Flask) -> None:
                 return redirect(url_for("faculty.dashboard"))
             elif role == "student":
                 return redirect(url_for("student.dashboard"))
-        return render_template("public/home.html", page="home", drawer_open=False)
+        return render_template("public/home.html", page="home", drawer_open=True)
 
     @app.route("/about")
     def about():

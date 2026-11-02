@@ -1,135 +1,52 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ (requested_role|title ~ ' Login') if requested_role else 'Login' }} | EduManage Pro</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <style>
-    body {
-      background: linear-gradient(135deg, #0f2540 0%, #1a3c5e 50%, #2563eb 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      padding: 20px;
-    }
-    .login-card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
-      width: 100%;
-      max-width: 440px;
-      overflow: hidden;
-    }
-    .login-brand {
-      background: #f8fafc;
-      padding: 30px;
-      text-align: center;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .brand-icon {
-      width: 60px;
-      height: 60px;
-      background: #2563eb;
-      color: white;
-      border-radius: 12px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 30px;
-      margin-bottom: 12px;
-      box-shadow: 0 4px 12px rgba(37,99,235,0.3);
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ requested_role|title }} Login | EduManage Pro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;color:#fff;font-family:var(--font-body,Manrope,sans-serif);background:linear-gradient(90deg,#09241dd9 0%,#0b281d58 49%,#061e18a6 100%),url('{{ url_for('static', filename='img/campus-bg.png') }}') center/cover fixed}.page{min-height:100vh;display:flex;flex-direction:column;padding:26px clamp(24px,4vw,64px) 34px}.top{display:flex;justify-content:space-between;align-items:center}.brand{display:flex;align-items:center;gap:13px;color:white;text-decoration:none;font:700 25px Fraunces,Georgia,serif}.brand-mark{width:48px;height:48px;background:#e9b94e;color:#12352d;display:grid;place-items:center;border-radius:50% 50% 46% 46%;font-size:24px}.back{color:#fff;text-decoration:none;font-weight:700}.back:hover{color:#f1c761}.content{flex:1;display:grid;grid-template-columns:minmax(300px,1fr) minmax(420px,570px);align-items:center;gap:clamp(40px,8vw,130px);max-width:1450px;width:100%;margin:auto}.message{max-width:590px;padding:30px 0}.message .rule{height:4px;width:76px;background:#efbd4f;margin-bottom:28px}.message h1{font:600 clamp(48px,6vw,82px)/1.04 Fraunces,Georgia,serif;margin:0 0 20px;text-shadow:0 3px 20px #0004}.message p{font-size:15px;letter-spacing:.15em;color:#e4e6dc;text-transform:uppercase}.card{background:#0d3027c9;border:1px solid #ffffff52;border-radius:18px;padding:clamp(27px,4vw,48px);box-shadow:0 22px 70px #05171175;backdrop-filter:blur(17px)}.card h2{font:600 clamp(32px,4vw,44px)/1.1 Fraunces,Georgia,serif;margin:0 0 7px}.subtitle{color:#d0d9d3;margin:0 0 28px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid #ffffff45;margin-bottom:26px}.tab{padding:12px 4px;color:#c8d2cc;text-align:center;text-decoration:none;font-weight:700;border-bottom:3px solid transparent;margin-bottom:-2px}.tab:hover,.tab.active{color:white;border-color:#efbd4f}.flash-stack{margin-bottom:17px}.flash{padding:11px 13px;border-radius:8px;background:#f8d7da;color:#842029;font-size:13px}.field{margin-bottom:20px}.field label{display:block;font-weight:700;font-size:13px;margin-bottom:8px}.input-wrap{display:flex;align-items:center;background:#f8f8f5;color:#68736c;border-radius:9px;padding:0 15px;min-height:56px}.input-wrap>i{font-size:18px}.input-wrap input{width:100%;min-width:0;height:56px;border:0;outline:0;background:transparent;padding:0 13px;color:#1c2823;font:500 15px Manrope,sans-serif}.input-wrap input::placeholder{color:#858d88}.password-toggle{border:0;background:transparent;color:#596a62;padding:7px;cursor:pointer;font-size:18px}.options{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:3px 0 25px;font-size:13px}.remember{display:flex;align-items:center;gap:9px;color:#f1f2ed}.remember input{accent-color:#e9b94e;width:17px;height:17px}.forgot{color:#f1c761;text-decoration:none}.forgot:hover{color:white}.submit{width:100%;border:0;border-radius:9px;background:#e9b94e;color:#17231b;min-height:58px;font:800 15px Manrope,sans-serif;cursor:pointer;transition:.2s}.submit:hover{background:#f4cc70;transform:translateY(-1px)}.secure{text-align:center;color:#c3d0c8;font-size:12px;margin:25px 0 0}.secure i{color:#efbd4f;margin-right:7px}
+    @media(max-width:900px){.content{grid-template-columns:1fr;max-width:600px;gap:0;padding:48px 0}.message{padding:0 0 28px}.message .rule{margin-bottom:17px}.message h1{font-size:clamp(42px,9vw,62px)}.message p{font-size:12px}.card{padding:28px}}
+    @media(max-width:520px){.page{padding:17px 16px 24px}.brand{font-size:19px;gap:9px}.brand-mark{width:39px;height:39px}.back{font-size:12px}.content{padding:40px 0}.message{padding-bottom:23px}.message h1{font-size:42px}.card{padding:24px 19px}.card h2{font-size:33px}.subtitle{margin-bottom:20px}.tab{font-size:13px}.options{font-size:12px}}
+  </style>
 </head>
 <body>
-
-<div class="login-card">
-  <div class="login-brand">
-    <div class="brand-icon">
-      <i class="bi bi-mortarboard-fill"></i>
+  <main class="page">
+    <header class="top">
+      <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark"><i class="bi bi-mortarboard-fill"></i></span><span>EduManage Pro</span></a>
+      <a class="back" href="{{ url_for('index') }}"><i class="bi bi-arrow-left me-1"></i> Back to Home</a>
+    </header>
+    <div class="content">
+      <section class="message"><div class="rule"></div><h1>Your next chapter starts here.</h1><p>People &nbsp;|&nbsp; Purpose &nbsp;|&nbsp; A brighter tomorrow</p></section>
+      <section class="card" aria-label="College portal sign in">
+        <h2>Welcome back</h2><p class="subtitle">Sign in to your college portal</p>
+        <nav class="tabs" aria-label="Choose account type">
+          <a class="tab {{ 'active' if requested_role == 'student' else '' }}" href="{{ url_for('auth.login', role='student') }}" {% if requested_role == 'student' %}aria-current="page"{% endif %}>Student</a>
+          <a class="tab {{ 'active' if requested_role == 'faculty' else '' }}" href="{{ url_for('auth.login', role='faculty') }}" {% if requested_role == 'faculty' %}aria-current="page"{% endif %}>Faculty</a>
+          <a class="tab {{ 'active' if requested_role == 'admin' else '' }}" href="{{ url_for('auth.login', role='admin') }}" {% if requested_role == 'admin' %}aria-current="page"{% endif %}>Admin</a>
+        </nav>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}<div class="flash-stack">{% for category, message in messages %}<div class="flash" role="alert">{{ message }}</div>{% endfor %}</div>{% endif %}
+        {% endwith %}
+        <form method="POST" action="{{ url_for('auth.login', role=requested_role) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="role" value="{{ requested_role }}">
+          <div class="field"><label for="email">Email address</label><div class="input-wrap"><i class="bi bi-envelope"></i><input id="email" type="email" name="email" required autocomplete="username" placeholder="you@college.edu.in" autofocus></div></div>
+          <div class="field"><label for="password">Password</label><div class="input-wrap"><i class="bi bi-lock"></i><input id="password" type="password" name="password" required autocomplete="current-password" placeholder="Enter your password"><button class="password-toggle" type="button" onclick="togglePassword()" aria-label="Show password"><i id="passwordIcon" class="bi bi-eye"></i></button></div></div>
+          <div class="options"><label class="remember"><input type="checkbox" name="remember_me"> Remember me</label><a class="forgot" href="{{ url_for('auth.forgot_password') }}">Forgot password?</a></div>
+          <button class="submit" type="submit">Sign in <i class="bi bi-arrow-right ms-1"></i></button>
+        </form>
+        <p class="secure"><i class="bi bi-shield-check"></i>Secure access to your college portal</p>
+      </section>
     </div>
-    <h3 class="fw-bold mb-1 text-primary">EduManage Pro</h3>
-    <p class="text-muted mb-0">{{ (requested_role|title ~ ' Portal') if requested_role else 'College Management Portal' }}</p>
-  </div>
-
-  <div class="p-4 p-sm-5">
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show small" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    <form method="POST" action="{{ url_for('auth.login', role=requested_role) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% if requested_role %}<input type="hidden" name="role" value="{{ requested_role }}">{% endif %}
-
-      <div class="mb-3">
-        <label class="form-label fw-semibold small text-muted">Email Address</label>
-        <div class="input-group">
-          <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
-          <input type="email" name="email" class="form-control border-start-0 bg-light" required placeholder="admin@college.edu" autofocus>
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <label class="form-label fw-semibold small text-muted mb-0">Password</label>
-          <a href="{{ url_for('auth.forgot_password') }}" class="small text-decoration-none text-primary">Forgot Password?</a>
-        </div>
-        <div class="input-group mt-1">
-          <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
-          <input type="password" name="password" id="loginPassword" class="form-control border-start-0 bg-light" required placeholder="••••••••">
-          <button class="btn btn-outline-secondary border-start-0" type="button" onclick="togglePasswordVisibility()">
-            <i class="bi bi-eye" id="toggleIcon"></i>
-          </button>
-        </div>
-      </div>
-
-      <div class="form-check mb-4">
-        <input class="form-check-input" type="checkbox" name="remember_me" id="rememberMe">
-        <label class="form-check-label small text-muted" for="rememberMe">
-          Keep me signed in for 8 hours
-        </label>
-      </div>
-
-      <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
-        <i class="bi bi-box-arrow-in-right me-1"></i> Sign In{{ (' as ' ~ requested_role|title) if requested_role else ' to Portal' }}
-      </button>
-    </form>
-
-    <div class="mt-4 pt-3 border-top text-center text-muted small">
-      <i class="bi bi-shield-check me-1 text-success"></i>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-function togglePasswordVisibility() {
-  const pwd = document.getElementById('loginPassword');
-  const icon = document.getElementById('toggleIcon');
-  if (pwd.type === 'password') {
-    pwd.type = 'text';
-    icon.className = 'bi bi-eye-slash';
-  } else {
-    pwd.type = 'password';
-    icon.className = 'bi bi-eye';
-  }
-}
-</script>
+  </main>
+  <script>
+    function togglePassword(){const input=document.getElementById('password');const icon=document.getElementById('passwordIcon');const shown=input.type==='password';input.type=shown?'text':'password';icon.className=shown?'bi bi-eye-slash':'bi bi-eye';}
+  </script>
 </body>
 </html>
