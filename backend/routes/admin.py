@@ -5,6 +5,7 @@ All routes require authentication + admin role.
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, current_app, abort
 from flask_login import login_required, current_user, login_user, logout_user
+from sqlalchemy.engine import make_url
 from decimal import Decimal
 from werkzeug.security import generate_password_hash
 from extensions import db
@@ -869,7 +870,23 @@ def audit_logs():
 @login_required
 @admin_required
 def settings():
-    return render_template('admin/settings.html')
+    database_url = make_url(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    session_lifetime = current_app.config['PERMANENT_SESSION_LIFETIME']
+    session_hours = max(1, round(session_lifetime.total_seconds() / 3600))
+    region = current_app.config.get('AWS_REGION') or 'Not configured'
+    if region == 'ap-south-1':
+        region = 'ap-south-1 (Mumbai)'
+
+    return render_template(
+        'admin/settings.html',
+        aws_region=region,
+        s3_bucket=current_app.config.get('S3_BUCKET_NAME') or 'Not configured',
+        database_engine=database_url.get_backend_name().upper(),
+        session_hours=session_hours,
+        secure_cookie=bool(current_app.config.get('SESSION_COOKIE_SECURE')),
+        csrf_enabled=bool(current_app.config.get('WTF_CSRF_ENABLED')),
+        max_upload_mb=round(current_app.config.get('MAX_CONTENT_LENGTH', 0) / (1024 * 1024)),
+    )
 
 
 # ---------------------------------------------------------------------------

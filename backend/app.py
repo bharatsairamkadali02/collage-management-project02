@@ -73,6 +73,15 @@ def create_app(config_name: str | None = None) -> Flask:
     # ------------------------------------------------------------------ #
     _register_blueprints(app)
 
+    @app.after_request
+    def prevent_authenticated_page_caching(response):
+        """Prevent a browser from showing protected pages from cache after logout."""
+        if current_user.is_authenticated:
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
+
     @app.get("/health")
     def health_check():
         """Load-balancer and operations health check for the app and RDS link."""

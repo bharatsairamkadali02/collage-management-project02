@@ -65,16 +65,20 @@ def login():
 
 
 # ---------------------------------------------------------------------------
-# GET /auth/logout
+# POST /auth/logout
 # ---------------------------------------------------------------------------
-@auth.route('/logout')
+@auth.route('/logout', methods=['POST'])
 @login_required
 def logout():
     """Log the current user out and redirect to the login page."""
     current_app.logger.info('User %s logged out.', current_user.id)
     logout_user()
     flash('You have been logged out successfully.', 'info')
-    return redirect(url_for('auth.login'))
+    response = redirect(url_for('auth.login'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 # ---------------------------------------------------------------------------
