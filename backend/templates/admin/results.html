@@ -71,10 +71,29 @@
       </div>
       <div class="modal-body">
         <div class="mb-3">
+          <label class="form-label fw-semibold">Academic Year <span class="text-danger">*</span></label>
+          <select id="pubAcademicYearId" class="form-select" required>
+            <option value="">Select Academic Year</option>
+            {% for year in academic_years %}
+            <option value="{{ year.id }}" {% if year.is_current %}selected{% endif %}>{{ year.year_label }}{% if year.is_current %} (Current){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
+          <select id="pubDepartmentId" class="form-select" required>
+            <option value="">Select Department</option>
+            {% for department in departments %}
+            <option value="{{ department.id }}">{{ department.department_name }} ({{ department.department_code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
           <label class="form-label fw-semibold">Semester <span class="text-danger">*</span></label>
-          <select id="pubSemesterId" class="form-select">
+          <select id="pubSemesterId" class="form-select" required disabled>
+            <option value="">Select year and department first</option>
             {% for s in semesters %}
-            <option value="{{ s.id }}">Semester {{ s.semester_number }} ({{ s.academic_year.year_label if s.academic_year else '' }})</option>
+            <option value="{{ s.id }}" data-year="{{ s.academic_year_id }}" data-department="{{ s.department_id }}" hidden disabled>Semester {{ s.semester_number }}</option>
             {% endfor %}
           </select>
         </div>
@@ -84,15 +103,58 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-success" onclick="executePublish()">Publish Now</button>
+        <button type="button" id="publishResultsButton" class="btn btn-success" onclick="executePublish()" disabled>Publish Now</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
+const publishYearSelect = document.getElementById('pubAcademicYearId');
+const publishDepartmentSelect = document.getElementById('pubDepartmentId');
+const publishSemesterSelect = document.getElementById('pubSemesterId');
+const publishButton = document.getElementById('publishResultsButton');
+
+function updatePublishSemesters() {
+  const yearId = publishYearSelect.value;
+  const departmentId = publishDepartmentSelect.value;
+  let available = 0;
+  publishSemesterSelect.value = '';
+
+  Array.from(publishSemesterSelect.options).slice(1).forEach(option => {
+    const matches = Boolean(yearId && departmentId)
+      && option.dataset.year === yearId
+      && option.dataset.department === departmentId;
+    option.hidden = !matches;
+    option.disabled = !matches;
+    if (matches) available += 1;
+  });
+
+  if (!yearId || !departmentId) {
+    publishSemesterSelect.value = '';
+    publishSemesterSelect.disabled = true;
+    publishSemesterSelect.options[0].textContent = 'Select year and department first';
+  } else if (!available) {
+    publishSemesterSelect.value = '';
+    publishSemesterSelect.disabled = true;
+    publishSemesterSelect.options[0].textContent = 'No semesters available';
+  } else {
+    publishSemesterSelect.options[0].textContent = 'Select Semester';
+    publishSemesterSelect.disabled = false;
+  }
+  publishButton.disabled = !publishSemesterSelect.value;
+}
+
+publishYearSelect.addEventListener('change', updatePublishSemesters);
+publishDepartmentSelect.addEventListener('change', updatePublishSemesters);
+publishSemesterSelect.addEventListener('change', () => {
+  publishButton.disabled = !publishSemesterSelect.value;
+});
+updatePublishSemesters();
+
 function executePublish() {
   const semId = document.getElementById('pubSemesterId').value;
+  if (!semId) return;
   fetch('/results/publish', {
     method: 'POST',
     headers: {

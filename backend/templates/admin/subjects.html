@@ -77,7 +77,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
-            <select name="department_id" class="form-select" required>
+            <select name="department_id" id="subjectDepartmentSelect" class="form-select" required>
               <option value="">Select Department...</option>
               {% for d in departments %}
               <option value="{{ d.id }}">{{ d.department_name }}</option>
@@ -86,10 +86,10 @@
           </div>
           <div class="col-md-6">
             <label class="form-label fw-semibold">Semester <span class="text-danger">*</span></label>
-            <select name="semester_id" class="form-select" required>
+            <select name="semester_id" id="subjectSemesterSelect" class="form-select" required disabled>
               <option value="">Select Semester...</option>
               {% for semester in semesters %}
-              <option value="{{ semester.id }}">{{ semester.department.department_name }} · {{ semester.academic_year.year_label }} · Semester {{ semester.semester_number }}</option>
+              <option value="{{ semester.id }}" data-department="{{ semester.department_id }}" hidden disabled>{{ semester.academic_year.year_label }} · Semester {{ semester.semester_number }}</option>
               {% endfor %}
             </select>
           </div>
@@ -124,6 +124,28 @@
 </div>
 
 <script>
+const subjectDepartmentSelect = document.getElementById('subjectDepartmentSelect');
+const subjectSemesterSelect = document.getElementById('subjectSemesterSelect');
+
+function updateSubjectSemesters() {
+  const departmentId = subjectDepartmentSelect.value;
+  let available = 0;
+  Array.from(subjectSemesterSelect.options).slice(1).forEach(option => {
+    const matches = Boolean(departmentId) && option.dataset.department === departmentId;
+    option.hidden = !matches;
+    option.disabled = !matches;
+    if (matches) available += 1;
+  });
+  subjectSemesterSelect.value = '';
+  subjectSemesterSelect.disabled = available === 0;
+  subjectSemesterSelect.options[0].textContent = departmentId
+    ? (available ? 'Select Semester...' : 'No semesters available')
+    : 'Select Department first';
+}
+
+subjectDepartmentSelect.addEventListener('change', updateSubjectSemesters);
+updateSubjectSemesters();
+
 function deleteSubject(id, name) {
   if (confirm(`Delete subject: ${name}?`)) {
     fetch(`/admin/subjects/${id}/delete`, {

@@ -162,7 +162,7 @@
           </div>
           <div class="col-md-3">
             <label class="form-label fw-semibold">Class Section <span class="text-danger">*</span></label>
-            <select class="form-select" name="class_section_id" id="classSectionSelect" required>
+            <select class="form-select" name="class_section_id" id="classSectionSelect" required disabled>
               <option value="">Select Section</option>
             </select>
             <div class="invalid-feedback">Class section is required.</div>
@@ -339,6 +339,7 @@ function loadClassSections() {
   const deptId = document.getElementById('departmentSelect').value;
   const sem    = document.getElementById('semesterSelect').value;
   const select = document.getElementById('classSectionSelect');
+  select.disabled = true;
   select.innerHTML = '<option value="">Loading…</option>';
 
   if (!deptId || !sem) {
@@ -347,17 +348,26 @@ function loadClassSections() {
   }
 
   fetchWithCsrf(`/admin/api/class-sections?department_id=${deptId}&semester=${sem}`)
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) throw new Error('Could not load class sections');
+      return r.json();
+    })
     .then(data => {
       select.innerHTML = '<option value="">Select Section</option>';
-      (data.sections || []).forEach(sec => {
+      const sections = data.sections || [];
+      sections.forEach(sec => {
         const opt = document.createElement('option');
         opt.value = sec.id;
-        opt.textContent = sec.name;
+        opt.textContent = `Section ${sec.name}`;
         select.appendChild(opt);
       });
+      if (sections.length) {
+        select.disabled = false;
+      } else {
+        select.innerHTML = '<option value="">No sections available</option>';
+      }
     })
-    .catch(() => { select.innerHTML = '<option value="">Failed to load</option>'; });
+    .catch(() => { select.innerHTML = '<option value="">Could not load sections</option>'; });
 }
 
 document.getElementById('departmentSelect').addEventListener('change', loadClassSections);

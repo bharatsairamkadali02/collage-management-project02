@@ -404,21 +404,33 @@ def departments():
 @admin_required
 def add_department():
     data = request.get_json(silent=True) or request.form
-    name = (data.get('name') or '').strip()
-    code = (data.get('code') or '').strip().upper()
+    name = (data.get('department_name') or data.get('name') or '').strip()
+    code = (data.get('department_code') or data.get('code') or '').strip().upper()
     description = (data.get('description') or '').strip()
-    hod_id = data.get('hod_id', type=int) if hasattr(data, 'get') else None
+    hod_value = data.get('hod_id')
+    hod_id = int(hod_value) if hod_value else None
 
     if not name or not code:
-        return jsonify({'error': 'Department name and code are required.'}), 400
+        message = 'Department name and code are required.'
+        if request.is_json:
+            return jsonify({'error': message}), 400
+        flash(message, 'danger')
+        return redirect(url_for('admin.departments'))
 
-    if Department.query.filter_by(code=code).first():
-        return jsonify({'error': 'Department code already exists.'}), 409
+    if Department.query.filter_by(code=code).first() or Department.query.filter_by(name=name).first():
+        message = 'A department with that name or code already exists.'
+        if request.is_json:
+            return jsonify({'error': message}), 409
+        flash(message, 'danger')
+        return redirect(url_for('admin.departments'))
 
     dept = Department(name=name, code=code, description=description, hod_id=hod_id)
     db.session.add(dept)
     db.session.commit()
-    return jsonify({'message': 'Department added.', 'department_id': dept.id}), 201
+    if request.is_json:
+        return jsonify({'message': 'Department added.', 'department_id': dept.id}), 201
+    flash(f'{name} department created.', 'success')
+    return redirect(url_for('admin.departments'))
 
 
 @admin_bp.route('/departments/<int:id>/edit', methods=['POST'])
@@ -470,17 +482,44 @@ def add_subject():
     data = request.get_json(silent=True) or request.form
     name = (data.get('subject_name') or data.get('name') or '').strip()
     code = (data.get('subject_code') or data.get('code') or '').strip().upper()
-    department_id = int(data.get('department_id', 0))
-    semester_id = int(data.get('semester_id', 0))
-    credits = int(data.get('credits', 3))
+    try:
+        if request.is_json:
+            department_id = int(data.get('department_id') or 0)
+            semester_id = int(data.get('semester_id') or 0)
+        else:
+            department_id = data.get('department_id', 0, type=int)
+            semester_id = data.get('semester_id', 0, type=int)
+        credits = int(data.get('credits') or 3)
+        max_internal_marks = float(data.get('max_internal_marks') or 40)
+        max_external_marks = float(data.get('max_external_marks') or 60)
+    except (TypeError, ValueError):
+        department_id, semester_id = 0, 0
+        credits, max_internal_marks, max_external_marks = 0, 0, 0
     subject_type = (data.get('subject_type') or 'theory').strip()
     description = (data.get('description') or '').strip()
 
-    if not name or not code or not department_id or not semester_id:
-        return jsonify({'error': 'Subject name, code, department, and semester are required.'}), 400
+    if not name or not code or not department_id or not semester_id or credits < 1:
+        message = 'Subject name, code, department, semester, and valid credits are required.'
+        if request.is_json:
+            return jsonify({'error': message}), 400
+        flash(message, 'danger')
+        return redirect(url_for('admin.subjects'))
 
     if Subject.query.filter_by(code=code).first():
-        return jsonify({'error': 'Subject code already exists.'}), 409
+        message = 'Subject code already exists.'
+        if request.is_json:
+            return jsonify({'error': message}), 409
+        flash(message, 'danger')
+        return redirect(url_for('admin.subjects'))
+
+    department = Department.query.get(department_id)
+    semester = Semester.query.get(semester_id)
+    if not department or not semester or semester.department_id != department_id:
+        message = 'Choose a semester that belongs to the selected department.'
+        if request.is_json:
+            return jsonify({'error': message}), 400
+        flash(message, 'danger')
+        return redirect(url_for('admin.subjects'))
 
     subject = Subject(
         subject_name=name,
@@ -488,13 +527,18 @@ def add_subject():
         semester_id=semester_id,
         department_id=department_id,
         credits=credits,
+        max_internal_marks=max_internal_marks,
+        max_external_marks=max_external_marks,
         subject_type=subject_type,
         description=description,
         is_active=True,
     )
     db.session.add(subject)
     db.session.commit()
-    return jsonify({'message': 'Subject added.', 'subject_id': subject.id}), 201
+    if request.is_json:
+        return jsonify({'message': 'Subject added.', 'subject_id': subject.id}), 201
+    flash(f'{name} added to {department.name}.', 'success')
+    return redirect(url_for('admin.subjects'))
 
 
 @admin_bp.route('/subjects/<int:id>/edit', methods=['POST'])
@@ -631,7 +675,13 @@ def examinations():
 def results():
     semesters = Semester.query.order_by(Semester.name).all()
     departments = Department.query.order_by(Department.name).all()
-    return render_template('admin/results.html', semesters=semesters, departments=departments)
+    academic_years = AcademicYear.query.order_by(AcademicYear.start_date.desc()).all()
+    return render_template(
+        'admin/results.html',
+        semesters=semesters,
+        departments=departments,
+        academic_years=academic_years,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -967,6 +1017,40 @@ def add_faculty_assignment():
 # ---------------------------------------------------------------------------
 # API – Students in a class section
 # ---------------------------------------------------------------------------
+@admin_bp.route('/api/class-sections')
+@login_required
+@admin_required
+def api_class_sections():
+    """Return current-year sections for a department and semester number."""
+    department_id = request.args.get('department_id', type=int)
+    semester_number = request.args.get('semester', type=int)
+    if not department_id or not semester_number:
+        return jsonify({'sections': []}), 200
+
+    academic_year = (
+        AcademicYear.query.filter_by(is_current=True)
+        .order_by(AcademicYear.start_date.desc())
+        .first()
+    )
+    if academic_year is None:
+        return jsonify({'sections': []}), 200
+
+    sections = (
+        ClassSection.query
+        .join(Semester, ClassSection.semester_id == Semester.id)
+        .filter(
+            ClassSection.department_id == department_id,
+            ClassSection.academic_year_id == academic_year.id,
+            Semester.semester_number == semester_number,
+        )
+        .order_by(ClassSection.section_name)
+        .all()
+    )
+    return jsonify({
+        'sections': [{'id': section.id, 'name': section.section_name} for section in sections]
+    }), 200
+
+
 @admin_bp.route('/api/students-in-class/<int:class_section_id>')
 @login_required
 @admin_required
