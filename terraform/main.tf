@@ -363,7 +363,8 @@ resource "aws_db_instance" "college_rds" {
   multi_az               = false
   deletion_protection    = true
 
-  backup_retention_period   = 7
+  # New AWS Free Plan accounts may reject 7 days; 1 day keeps automated backups enabled.
+  backup_retention_period   = 1
   backup_window             = "02:00-03:00"
   maintenance_window        = "sun:03:30-sun:04:30"
   auto_minor_version_upgrade = true
@@ -371,7 +372,8 @@ resource "aws_db_instance" "college_rds" {
   skip_final_snapshot       = false
   final_snapshot_identifier = "college-final-snapshot"
 
-  performance_insights_enabled = true
+  # This DB instance class/account configuration doesn't support Performance Insights.
+  performance_insights_enabled = false
 
   tags = {
     Name = "${var.project_name}-rds"
@@ -382,6 +384,11 @@ resource "aws_db_instance" "college_rds" {
 # 10. EC2 Instance
 ###############################################################################
 
+# Resolve the configured key pair during planning, before attempting EC2 creation.
+data "aws_key_pair" "ec2" {
+  key_name = var.key_pair_name
+}
+
 resource "aws_instance" "app_server" {
   ami           = var.ubuntu_ami
   instance_type = var.ec2_instance_type
@@ -389,7 +396,7 @@ resource "aws_instance" "app_server" {
   subnet_id                   = aws_subnet.public_subnet.id
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
-  key_name                    = var.key_pair_name
+  key_name                    = data.aws_key_pair.ec2.key_name
   associate_public_ip_address = true
 
   user_data = file("${path.module}/user_data.sh")

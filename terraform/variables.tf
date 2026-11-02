@@ -70,9 +70,14 @@ variable "ubuntu_ami" {
 }
 
 variable "key_pair_name" {
-  description = "Name of the existing EC2 Key Pair for SSH access (required)"
+  description = "Name of an EC2 Key Pair that already exists in var.aws_region (required; do not enter the .pem filename or file path)"
   type        = string
   # No default – must be provided by the operator
+
+  validation {
+    condition     = length(trimspace(var.key_pair_name)) > 0 && lower(trimspace(var.key_pair_name)) != "your-key-pair-name"
+    error_message = "Set key_pair_name to an EC2 key pair that exists in the selected AWS region."
+  }
 }
 
 variable "allowed_ssh_cidr" {
