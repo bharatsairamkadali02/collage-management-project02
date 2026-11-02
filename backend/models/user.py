@@ -140,7 +140,6 @@ class User(db.Model, UserMixin):
     audit_logs = db.relationship("AuditLog", back_populates="user", lazy="dynamic")
 
     __table_args__ = (
-        db.Index("ix_users_email", "email"),
         db.Index("ix_users_username", "username"),
     )
 
