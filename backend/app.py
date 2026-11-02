@@ -153,7 +153,15 @@ def _register_blueprints(app: Flask) -> None:
                 return redirect(url_for("faculty.dashboard"))
             elif role == "student":
                 return redirect(url_for("student.dashboard"))
-        return redirect(url_for("auth.login"))
+        return render_template("public/home.html", page="home", drawer_open=False)
+
+    @app.route("/about")
+    def about():
+        return render_template("public/home.html", page="about", drawer_open=False)
+
+    @app.route("/departments")
+    def public_departments():
+        return render_template("public/home.html", page="home", drawer_open=True)
 
     # Auth
     from routes.auth import auth as auth_bp

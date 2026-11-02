@@ -33,6 +33,10 @@ def _redirect_by_role(user):
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
     """Login form. Validates credentials and redirects by role."""
+    requested_role = request.values.get('role', '').strip().lower()
+    if requested_role not in {'admin', 'faculty', 'student'}:
+        requested_role = ''
+
     if current_user.is_authenticated:
         return _redirect_by_role(current_user)
 
@@ -44,14 +48,18 @@ def login():
 
         if not email or not password:
             flash('Email and password are required.', 'danger')
-            return render_template('auth/login.html')
+            return render_template('auth/login.html', requested_role=requested_role)
 
         user = User.query.filter_by(email=email, is_active=True).first()
 
-        if user is None or not user.check_password(password):
+        if (
+            user is None
+            or not user.check_password(password)
+            or (requested_role and (not user.role or user.role.name != requested_role))
+        ):
             flash('Invalid email or password.', 'danger')
             current_app.logger.warning('Failed login attempt for email: %s', email)
-            return render_template('auth/login.html')
+            return render_template('auth/login.html', requested_role=requested_role)
 
         login_user(user, remember=remember)
         current_app.logger.info('User %s logged in successfully.', user.id)
@@ -61,7 +69,7 @@ def login():
             return redirect(next_page)
         return _redirect_by_role(user)
 
-    return render_template('auth/login.html')
+    return render_template('auth/login.html', requested_role=requested_role)
 
 
 # ---------------------------------------------------------------------------
