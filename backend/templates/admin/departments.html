@@ -40,8 +40,8 @@
                 <span class="text-muted fst-italic">Not Assigned</span>
               {% endif %}
             </td>
-            <td>{{ d.faculty_members|length }}</td>
-            <td>{{ d.students|length }}</td>
+            <td>{{ faculty_counts.get(d.id, 0) }}</td>
+            <td>{{ student_counts.get(d.id, 0) }}</td>
             <td>
               {% if d.is_active %}
               <span class="badge bg-success-subtle text-success">Active</span>

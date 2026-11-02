@@ -5,6 +5,7 @@ All routes require authentication + admin role.
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, current_app, abort
 from flask_login import login_required, current_user, login_user, logout_user
+from sqlalchemy import func
 from sqlalchemy.engine import make_url
 from decimal import Decimal
 from werkzeug.security import generate_password_hash
@@ -396,7 +397,24 @@ def delete_faculty(id):
 @admin_required
 def departments():
     all_departments = Department.query.order_by(Department.name).all()
-    return render_template('admin/departments.html', departments=all_departments)
+    faculty_counts = dict(
+        db.session.query(Faculty.department_id, func.count(Faculty.id))
+        .filter(Faculty.department_id.isnot(None))
+        .group_by(Faculty.department_id)
+        .all()
+    )
+    student_counts = dict(
+        db.session.query(Student.department_id, func.count(Student.id))
+        .filter(Student.department_id.isnot(None))
+        .group_by(Student.department_id)
+        .all()
+    )
+    return render_template(
+        'admin/departments.html',
+        departments=all_departments,
+        faculty_counts=faculty_counts,
+        student_counts=student_counts,
+    )
 
 
 @admin_bp.route('/departments/add', methods=['POST'])
