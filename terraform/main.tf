@@ -326,7 +326,7 @@ resource "aws_s3_bucket_cors_configuration" "college_bucket_cors" {
 resource "aws_db_subnet_group" "college_db_subnet_group" {
   name        = "${var.project_name}-db-subnet-group"
   description = "Private subnet group for College Management RDS"
-  subnet_ids  = [
+  subnet_ids = [
     aws_subnet.private_subnet_az1.id,
     aws_subnet.private_subnet_az2.id,
   ]
@@ -359,18 +359,18 @@ resource "aws_db_instance" "college_rds" {
   db_subnet_group_name   = aws_db_subnet_group.college_db_subnet_group.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
 
-  publicly_accessible    = false
-  multi_az               = false
-  deletion_protection    = true
+  publicly_accessible = false
+  multi_az            = false
+  deletion_protection = true
 
   # New AWS Free Plan accounts may reject 7 days; 1 day keeps automated backups enabled.
-  backup_retention_period   = 1
-  backup_window             = "02:00-03:00"
-  maintenance_window        = "sun:03:30-sun:04:30"
+  backup_retention_period    = 1
+  backup_window              = "02:00-03:00"
+  maintenance_window         = "sun:03:30-sun:04:30"
   auto_minor_version_upgrade = true
 
   skip_final_snapshot       = false
-  final_snapshot_identifier = "college-final-snapshot"
+  final_snapshot_identifier = "college-final-snapshot-20261102-2303"
 
   # This DB instance class/account configuration doesn't support Performance Insights.
   performance_insights_enabled = false
@@ -414,7 +414,7 @@ resource "aws_instance" "app_server" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"   # IMDSv2 enforced
+    http_tokens                 = "required" # IMDSv2 enforced
     http_put_response_hop_limit = 1
   }
 

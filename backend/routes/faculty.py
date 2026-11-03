@@ -59,7 +59,7 @@ def dashboard():
         AttendanceSession.query
         .filter(
             AttendanceSession.faculty_id == faculty.id,
-            AttendanceSession.date == today,
+            AttendanceSession.session_date == today,
         )
         .count()
     )
@@ -78,6 +78,14 @@ def dashboard():
 
     return render_template(
         'faculty/dashboard.html',
+        stats={
+            "total_students": assigned_students,
+            "assigned_subjects": len(subject_ids),
+            "today_classes": today_sessions,
+            "pending_assignments": Assignment.query.filter_by(
+                faculty_id=faculty.id, status="draft"
+            ).count(),
+        },
         faculty=faculty,
         assigned_students=assigned_students,
         assigned_subjects=len(subject_ids),
