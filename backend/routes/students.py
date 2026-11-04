@@ -127,6 +127,12 @@ def dashboard():
 
     return render_template(
         "student/dashboard.html",
+        stats={
+            "attendance_pct": att_summary["percentage"],
+            "upcoming_exams": len(upcoming_exams),
+            "pending_assignments": len(pending_assignments),
+            "fee_balance": f"{fee_balance:,.0f}",
+        },
         student=student,
         att_summary=att_summary,
         upcoming_exams=upcoming_exams,
@@ -134,6 +140,7 @@ def dashboard():
         pending_assignments=pending_assignments,
         fee_balance=fee_balance,
         notifications=notifications,
+        recent_notifications=notifications,
     )
 
 

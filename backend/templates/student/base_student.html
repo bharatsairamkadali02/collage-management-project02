@@ -1,4 +1,4 @@
-{% extends "../base.html" %}
+{% extends "base.html" %}
 
 {% block sidebar %}
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3" style="width:260px;min-height:100vh;background:linear-gradient(180deg,#6a1b9a 0%,#4a0072 100%);">
@@ -91,7 +91,6 @@
 
 {% block content %}
 <div class="d-flex" style="min-height:100vh;">
-  {% block sidebar %}{% endblock %}
   <div class="flex-grow-1 d-flex flex-column" style="background:#f5f0fb;min-width:0;">
     <!-- Topbar -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom px-4 py-2 sticky-top shadow-sm">
