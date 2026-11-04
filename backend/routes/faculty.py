@@ -147,7 +147,7 @@ def student_details(student_id):
     attendance_records = Attendance.query.filter_by(student_id=student_id).all()
 
     return render_template(
-        'faculty/student-details.html',
+        'faculty/student_details.html',
         student=student,
         results=results,
         attendance_records=attendance_records,

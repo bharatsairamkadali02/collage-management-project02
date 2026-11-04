@@ -216,7 +216,7 @@
           <ul class="dropdown-menu dropdown-menu-end shadow" style="width:320px; min-width:320px;" aria-labelledby="notifDropdown">
             <li><h6 class="dropdown-header d-flex justify-content-between align-items-center">
               Notifications
-              <a href="{{ url_for('admin.notifications') }}" class="text-primary small">View all</a>
+              <a href="{{ url_for('student.notifications') if current_user.role and current_user.role.name == 'student' else url_for('faculty.notifications') if current_user.role and current_user.role.name == 'faculty' else url_for('admin.notifications') }}" class="text-primary small">View all</a>
             </h6></li>
             <li><hr class="dropdown-divider my-0"></li>
             {% if recent_notifications %}

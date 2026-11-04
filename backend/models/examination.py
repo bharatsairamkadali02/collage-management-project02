@@ -2,7 +2,6 @@
 from datetime import datetime
 from extensions import db
 from sqlalchemy.orm import synonym
-from sqlalchemy.orm import synonym
 
 
 class Exam(db.Model):
