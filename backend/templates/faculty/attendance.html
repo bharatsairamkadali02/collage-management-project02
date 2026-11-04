@@ -6,7 +6,7 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
     <h5 class="fw-bold mb-1">Attendance Management</h5>
-    <p class="text-muted mb-0 small">Mark and track student attendance for your classes</p>
+    <p class="text-muted mb-0 small">Mark and track student attendance by Department, Semester, Section, and Subject</p>
   </div>
 </div>
 
@@ -20,45 +20,47 @@
       </div>
       <div class="card-body">
         <form id="attendanceFilterForm">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold small">Class Section <span class="text-danger">*</span></label>
-              <select id="sectionSelect" name="section" class="form-select" required onchange="filterSubjectsBySection()">
-                <option value="">-- Select Section --</option>
-                {% for dept_name, sections in sections_by_dept.items() %}
-                <optgroup label="{{ dept_name }}">
-                  {% for section in sections %}
-                  <option value="{{ section.id }}" data-department="{{ section.department_id }}" data-semester="{{ section.semester_id }}">
-                    Semester {{ section.semester.semester_number if section.semester else '1' }} &bull; Section {{ section.section_name or section.name }}
-                  </option>
-                  {% endfor %}
-                </optgroup>
+          <!-- Row 1: Separate Department, Semester, Class Section, Subject -->
+          <div class="row g-3 mb-2">
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label fw-semibold small">Department <span class="text-danger">*</span></label>
+              <select id="departmentSelect" class="form-select" required onchange="onFilterChange()">
+                <option value="">-- Select Department --</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}">{{ dept.name }} ({{ dept.code }})</option>
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label fw-semibold small">Semester <span class="text-danger">*</span></label>
+              <select id="semesterSelect" class="form-select" required onchange="onFilterChange()">
+                <option value="">-- Select Semester --</option>
+                {% for s_num in range(1, 9) %}
+                <option value="{{ s_num }}">Semester {{ s_num }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label fw-semibold small">Class Section <span class="text-danger">*</span></label>
+              <select id="sectionSelect" name="section" class="form-select" required>
+                <option value="">-- Select Dept &amp; Sem --</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
               <label class="form-label fw-semibold small">Subject <span class="text-danger">*</span></label>
               <select id="subjectSelect" name="subject" class="form-select" required>
-                <option value="">-- Select Subject --</option>
-                {% for dept_name, subjects in subjects_by_dept.items() %}
-                <optgroup label="{{ dept_name }}">
-                  {% for subj in subjects %}
-                  <option value="{{ subj.id }}" data-department="{{ subj.department_id }}" data-semester="{{ subj.semester_id }}">
-                    {{ subj.code }} - {{ subj.name }} (Sem {{ subj.semester.semester_number if subj.semester else '1' }})
-                  </option>
-                  {% endfor %}
-                </optgroup>
-                {% endfor %}
+                <option value="">-- Select Dept &amp; Sem --</option>
               </select>
-              <div class="form-text text-muted" id="subjectHelpText" style="font-size:0.75rem;">
-                <i class="bi bi-funnel me-1"></i>Subjects auto-filter based on the selected Class Section.
-              </div>
             </div>
-            <div class="col-md-4">
+          </div>
+
+          <!-- Row 2: Date, Session Type, Load Button -->
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold small">Date <span class="text-danger">*</span></label>
               <input type="date" id="attendanceDate" name="date" class="form-control" value="{{ today }}" required>
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold small">Session Type</label>
               <select id="sessionTypeSelect" name="session_type" class="form-select">
                 <option value="lecture">Lecture</option>
@@ -66,7 +68,7 @@
                 <option value="tutorial">Tutorial</option>
               </select>
             </div>
-            <div class="col-md-4 d-flex align-items-end">
+            <div class="col-12 col-md-4">
               <button type="button" id="loadStudentsBtn" class="btn w-100" style="background:#0d6e6e;color:#fff;" onclick="loadStudents()">
                 <i class="bi bi-people me-2"></i>Load Students
               </button>
@@ -162,60 +164,83 @@
 </div>
 
 <script>
-function filterSubjectsBySection() {
+// Preloaded database records for instant cascading filtering
+const allSections = [
+  {% for sec in all_sections %}
+  {
+    id: {{ sec.id }},
+    name: "{{ sec.section_name or sec.name }}",
+    departmentId: {{ sec.department_id }},
+    semesterNumber: {{ sec.semester.semester_number if sec.semester else 1 }}
+  },
+  {% endfor %}
+];
+
+const allSubjects = [
+  {% for sub in all_subjects %}
+  {
+    id: {{ sub.id }},
+    code: "{{ sub.code }}",
+    name: "{{ sub.name | replace('\"', '\\\"') }}",
+    departmentId: {{ sub.department_id }},
+    semesterNumber: {{ sub.semester.semester_number if sub.semester else 1 }}
+  },
+  {% endfor %}
+];
+
+function onFilterChange() {
+  const deptSelect = document.getElementById('departmentSelect');
+  const semSelect = document.getElementById('semesterSelect');
   const sectionSelect = document.getElementById('sectionSelect');
-  const selectedOption = sectionSelect.options[sectionSelect.selectedIndex];
   const subjectSelect = document.getElementById('subjectSelect');
 
-  if (!selectedOption || !selectedOption.value) {
-    // If no section chosen, show all options and optgroups
-    subjectSelect.querySelectorAll('option').forEach(opt => {
-      opt.hidden = false;
-      opt.disabled = false;
-    });
-    subjectSelect.querySelectorAll('optgroup').forEach(grp => grp.hidden = false);
+  const deptId = parseInt(deptSelect.value) || null;
+  const semNum = parseInt(semSelect.value) || null;
+
+  // Reset section dropdown
+  sectionSelect.innerHTML = '';
+  // Reset subject dropdown
+  subjectSelect.innerHTML = '';
+
+  if (!deptId || !semNum) {
+    sectionSelect.innerHTML = '<option value="">-- Select Dept &amp; Sem first --</option>';
+    subjectSelect.innerHTML = '<option value="">-- Select Dept &amp; Sem first --</option>';
     return;
   }
 
-  const deptId = selectedOption.getAttribute('data-department');
-  const semId = selectedOption.getAttribute('data-semester');
-
-  let firstMatch = null;
-  subjectSelect.querySelectorAll('option').forEach(opt => {
-    if (!opt.value) return; // Keep "-- Select Subject --"
-    const optDept = opt.getAttribute('data-department');
-    const optSem = opt.getAttribute('data-semester');
-
-    const match = (optDept === deptId && (!semId || optSem === semId));
-    opt.hidden = !match;
-    opt.disabled = !match;
-    if (match && !firstMatch) {
-      firstMatch = opt;
-    }
-  });
-
-  // Hide optgroups that have no matching visible options
-  subjectSelect.querySelectorAll('optgroup').forEach(grp => {
-    const visibleCount = grp.querySelectorAll('option:not([hidden])').length;
-    grp.hidden = visibleCount === 0;
-  });
-
-  // Automatically select the first matching subject for convenience
-  if (firstMatch) {
-    subjectSelect.value = firstMatch.value;
+  // Filter sections by selected Department and Semester
+  const matchingSections = allSections.filter(s => s.departmentId === deptId && s.semesterNumber === semNum);
+  if (matchingSections.length > 0) {
+    matchingSections.forEach(s => {
+      sectionSelect.innerHTML += `<option value="${s.id}">Section ${s.name}</option>`;
+    });
+    sectionSelect.value = matchingSections[0].id; // Auto-select Section A
   } else {
-    subjectSelect.value = '';
+    sectionSelect.innerHTML = '<option value="">No sections found</option>';
+  }
+
+  // Filter subjects by selected Department and Semester
+  const matchingSubjects = allSubjects.filter(sub => sub.departmentId === deptId && sub.semesterNumber === semNum);
+  if (matchingSubjects.length > 0) {
+    matchingSubjects.forEach(sub => {
+      subjectSelect.innerHTML += `<option value="${sub.id}">${sub.code} - ${sub.name}</option>`;
+    });
+    subjectSelect.value = matchingSubjects[0].id; // Auto-select first subject
+  } else {
+    subjectSelect.innerHTML = '<option value="">No subjects found</option>';
   }
 }
 
 function loadStudents() {
+  const deptId = document.getElementById('departmentSelect').value;
+  const semNum = document.getElementById('semesterSelect').value;
   const sectionId = document.getElementById('sectionSelect').value;
   const subjectId = document.getElementById('subjectSelect').value;
   const date = document.getElementById('attendanceDate').value;
   const sessionType = document.getElementById('sessionTypeSelect').value;
 
-  if (!sectionId || !subjectId || !date) {
-    alert('Please select Section, Subject, and Date.');
+  if (!deptId || !semNum || !sectionId || !subjectId || !date) {
+    alert('Please select Department, Semester, Class Section, and Subject.');
     return;
   }
 
@@ -279,7 +304,7 @@ function resetForm() {
   document.getElementById('attendanceFilterForm').reset();
   document.getElementById('studentRows').innerHTML = '';
   document.getElementById('hiddenSessionId').value = '';
-  filterSubjectsBySection();
+  onFilterChange();
 }
 
 document.getElementById('attendanceForm').addEventListener('submit', function(e) {
