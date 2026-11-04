@@ -1,8 +1,8 @@
 {% extends "faculty/base_faculty.html" %}
 
-{% block title %}Create Examination{% endblock %}
+{% block title %}Create Examination{% endblock faculty_content %}
 
-{% block content %}
+{% block faculty_content %}
 <div class="page-header d-flex justify-content-between align-items-center mb-4">
   <div>
     <h2 class="page-title"><i class="bi bi-file-earmark-plus me-2 text-success"></i>Create MCQ Examination</h2>
@@ -38,7 +38,13 @@
           <select name="class_section_id" class="form-select" required>
             <option value="">Select Section...</option>
             {% for cs in class_sections %}
-            <option value="{{ cs.id }}">{{ cs.section_name }}</option>
+            <option value="{{ cs.id }}">
+              {%- if cs.semester and cs.semester.department -%}
+                {{ cs.semester.department.department_name }} &bull; Sem {{ cs.semester.semester_number }} &bull; Section {{ cs.section_name }}
+              {%- else -%}
+                {{ cs.section_name }}
+              {%- endif -%}
+            </option>
             {% endfor %}
           </select>
         </div>
@@ -85,4 +91,4 @@
     </form>
   </div>
 </div>
-{% endblock %}
+{% endblock faculty_content %}

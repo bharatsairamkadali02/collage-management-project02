@@ -459,13 +459,28 @@ def create_exam():
     faculty = _get_current_faculty()
     assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
 
+    # Build dropdown data: use assigned subjects/sections if available, else show all
+    if assignments:
+        subject_ids = list({a.subject_id for a in assignments})
+        section_ids = list({a.class_section_id for a in assignments})
+        subjects = Subject.query.filter(Subject.id.in_(subject_ids), Subject.is_active == True).order_by(Subject.subject_name).all()
+        class_sections = ClassSection.query.filter(ClassSection.id.in_(section_ids)).order_by(ClassSection.section_name).all()
+    else:
+        subjects = Subject.query.filter_by(is_active=True).order_by(Subject.subject_name).all()
+        class_sections = (
+            ClassSection.query
+            .join(Semester, ClassSection.semester_id == Semester.id)
+            .order_by(ClassSection.section_name)
+            .all()
+        )
+
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         subject_id = request.form.get('subject_id', type=int)
         class_section_id = request.form.get('class_section_id', type=int)
         semester_id = request.form.get('semester_id', type=int)
         academic_year_id = request.form.get('academic_year_id', type=int)
-        exam_date = request.form.get('exam_date')
+        exam_date = request.form.get('start_time') or request.form.get('exam_date')
         duration_minutes = request.form.get('duration_minutes', 60, type=int)
         total_marks = request.form.get('total_marks', 100, type=int)
         passing_marks = request.form.get('passing_marks', 40, type=int)
@@ -473,20 +488,23 @@ def create_exam():
         instructions = request.form.get('instructions', '').strip()
 
         if not all([title, subject_id, class_section_id, exam_date]):
-            flash('Title, subject, class, and date are required.', 'danger')
-            return render_template('faculty/create_exam.html', assignments=assignments)
+            flash('Title, subject, class section, and start date/time are required.', 'danger')
+            return render_template('faculty/create_exam.html', assignments=assignments, subjects=subjects, class_sections=class_sections)
 
+        # Soft auth: only enforce if faculty has assignments
         teaching_assignment = FacultyAssignment.query.filter_by(
             faculty_id=faculty.id,
             subject_id=subject_id,
             class_section_id=class_section_id,
-            is_active=True,
         ).first()
-        if not teaching_assignment:
-            abort(403)
+        if assignments and not teaching_assignment:
+            flash('You are not assigned to this subject/class combination.', 'danger')
+            return render_template('faculty/create_exam.html', assignments=assignments, subjects=subjects, class_sections=class_sections)
+
         class_section = ClassSection.query.get_or_404(class_section_id)
         semester_id = semester_id or class_section.semester_id
-        academic_year_id = academic_year_id or teaching_assignment.academic_year_id
+        if teaching_assignment:
+            academic_year_id = academic_year_id or teaching_assignment.academic_year_id
 
         exam = Exam(
             title=title,
@@ -508,7 +526,7 @@ def create_exam():
         flash('Exam created successfully. Add questions now.', 'success')
         return redirect(url_for('faculty.exam_questions', id=exam.id))
 
-    return render_template('faculty/create_exam.html', assignments=assignments)
+    return render_template('faculty/create_exam.html', assignments=assignments, subjects=subjects, class_sections=class_sections)
 
 
 @faculty_bp.route('/examinations/<int:id>/edit', methods=['GET', 'POST'])
