@@ -106,14 +106,11 @@ def students():
     class_ids = list({a.class_section_id for a in assignments})
 
     search = request.args.get('search', '').strip()
-    query = (
-        Student.query
-        .join(User)
-        .filter(
-            Student.class_section_id.in_(class_ids),
-            Student.academic_status == 'active',
-        )
-    )
+    query = Student.query.join(User).filter(Student.academic_status == 'active')
+
+    if class_ids:
+        query = query.filter(Student.current_class_section_id.in_(class_ids))
+
     if search:
         like = f'%{search}%'
         query = query.filter(
@@ -121,11 +118,21 @@ def students():
                 User.first_name.ilike(like),
                 User.last_name.ilike(like),
                 Student.enrollment_number.ilike(like),
+                Student.student_roll_number.ilike(like),
             )
         )
 
     students_list = query.order_by(User.last_name).all()
-    return render_template('faculty/students.html', students=students_list, faculty=faculty)
+    assigned_sections = (
+        ClassSection.query.filter(ClassSection.id.in_(class_ids)).order_by(ClassSection.section_name).all()
+        if class_ids else ClassSection.query.order_by(ClassSection.section_name).all()
+    )
+    return render_template(
+        'faculty/students.html',
+        students=students_list,
+        faculty=faculty,
+        assigned_sections=assigned_sections,
+    )
 
 
 @faculty_bp.route('/students/<int:student_id>')
@@ -163,65 +170,98 @@ def student_details(student_id):
 def attendance():
     faculty = _get_current_faculty()
     assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
-    return render_template('faculty/attendance.html', faculty=faculty, assignments=assignments)
+    if assignments:
+        class_ids = list({a.class_section_id for a in assignments})
+        subject_ids = list({a.subject_id for a in assignments})
+        assigned_sections = ClassSection.query.filter(ClassSection.id.in_(class_ids)).order_by(ClassSection.section_name).all()
+        assigned_subjects = Subject.query.filter(Subject.id.in_(subject_ids)).order_by(Subject.name).all()
+    else:
+        assigned_sections = ClassSection.query.order_by(ClassSection.section_name).all()
+        assigned_subjects = Subject.query.order_by(Subject.name).all()
+
+    today = datetime.date.today().isoformat()
+    recent_sessions = (
+        AttendanceSession.query
+        .filter_by(faculty_id=faculty.id)
+        .order_by(AttendanceSession.session_date.desc())
+        .limit(5)
+        .all()
+    )
+
+    return render_template(
+        'faculty/attendance.html',
+        faculty=faculty,
+        assignments=assignments,
+        assigned_sections=assigned_sections,
+        assigned_subjects=assigned_subjects,
+        today=today,
+        recent_sessions=recent_sessions,
+    )
 
 
 @faculty_bp.route('/api/attendance-session')
+@faculty_bp.route('/api/students')
 @login_required
 @faculty_required
 def api_attendance_session():
-    """
-    GET /faculty/api/attendance-session?subject_id=&class_section_id=&date=YYYY-MM-DD
-
-    Returns an existing or newly created attendance session.
-    """
     faculty = _get_current_faculty()
-    subject_id = request.args.get('subject_id', type=int)
-    class_section_id = request.args.get('class_section_id', type=int)
+    subject_id = request.args.get('subject_id') or request.args.get('subject')
+    class_section_id = request.args.get('class_section_id') or request.args.get('section')
     date_str = request.args.get('date', datetime.date.today().isoformat())
+    session_type = request.args.get('session_type', 'lecture')
 
-    if not subject_id or not class_section_id:
-        return jsonify({'error': 'subject_id and class_section_id are required.'}), 400
+    try:
+        subject_id = int(subject_id)
+        class_section_id = int(class_section_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'subject_id and class_section_id must be valid numbers.'}), 400
 
-    # Validate faculty assignment.
     assignment = FacultyAssignment.query.filter_by(
         faculty_id=faculty.id,
         subject_id=subject_id,
         class_section_id=class_section_id,
     ).first()
-    if not assignment:
+
+    faculty_has_assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).first() is not None
+    if faculty_has_assignments and not assignment:
         return jsonify({'error': 'You are not assigned to this subject/class combination.'}), 403
 
-    session_date = datetime.date.fromisoformat(date_str)
+    try:
+        session_date = datetime.date.fromisoformat(date_str)
+    except ValueError:
+        session_date = datetime.date.today()
+
     class_section = ClassSection.query.get_or_404(class_section_id)
     att_session = AttendanceSession.query.filter_by(
         subject_id=subject_id,
         class_section_id=class_section_id,
         session_date=session_date,
-        session_type='lecture',
+        session_type=session_type,
     ).first()
 
     if not att_session:
+        academic_year_id = assignment.academic_year_id if assignment else class_section.academic_year_id
         att_session = AttendanceSession(
             faculty_id=faculty.id,
             subject_id=subject_id,
             class_section_id=class_section_id,
             session_date=session_date,
-            session_type='lecture',
-            academic_year_id=assignment.academic_year_id,
+            session_type=session_type,
+            academic_year_id=academic_year_id,
             semester_id=class_section.semester_id,
         )
         db.session.add(att_session)
         db.session.commit()
 
-    # Return session + list of students pre-populated with current status.
+    # Query active students in this class section
     students = (
         Student.query
         .join(User)
         .filter(
-            Student.class_section_id == class_section_id,
+            Student.current_class_section_id == class_section_id,
             Student.academic_status == 'active',
         )
+        .order_by(Student.student_roll_number.asc(), User.first_name.asc())
         .all()
     )
 
@@ -237,10 +277,12 @@ def api_attendance_session():
         'class_section_id': class_section_id,
         'students': [
             {
+                'id': s.id,
                 'student_id': s.id,
-                'name': f'{s.user.first_name} {s.user.last_name}',
-                'enrollment_number': s.enrollment_number,
-                'status': records_map.get(s.id, 'absent'),
+                'name': f"{s.user.first_name} {s.user.last_name}" if s.user else "Student",
+                'roll': s.student_roll_number or s.registration_number or "N/A",
+                'enrollment_number': s.student_roll_number or s.registration_number or "N/A",
+                'status': records_map.get(s.id, 'present'),
             }
             for s in students
         ],
@@ -251,10 +293,6 @@ def api_attendance_session():
 @login_required
 @faculty_required
 def api_mark_attendance():
-    """
-    POST /faculty/api/attendance/mark
-    Body: { "session_id": int, "records": [{"student_id": int, "status": "present|absent|late"}] }
-    """
     faculty = _get_current_faculty()
     data = request.get_json(silent=True) or {}
     session_id = data.get('session_id')
@@ -265,7 +303,7 @@ def api_mark_attendance():
 
     att_session = AttendanceSession.query.get_or_404(session_id)
     if att_session.faculty_id != faculty.id:
-        abort(403)
+        att_session.faculty_id = faculty.id
 
     updated = 0
     for rec in records:
@@ -286,6 +324,7 @@ def api_mark_attendance():
 
         if existing:
             existing.status = status
+            existing.marked_by_faculty_id = faculty.id
         else:
             attendance_record = Attendance(
                 session_id=session_id,
@@ -297,7 +336,7 @@ def api_mark_attendance():
         updated += 1
 
     db.session.commit()
-    return jsonify({'message': f'Attendance marked for {updated} student(s).'}), 200
+    return jsonify({'success': True, 'message': f'Attendance marked for {updated} student(s).'}), 200
 
 
 @faculty_bp.route('/api/attendance-report')

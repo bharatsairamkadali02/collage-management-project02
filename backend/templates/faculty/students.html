@@ -59,40 +59,42 @@
           </tr>
         </thead>
         <tbody>
-          {% for student in students | default([
-            {'id':1,'name':'Aarav Sharma','roll':'CS21001','section':'CS-3A','attendance':82,'last_score':85,'photo':None},
-            {'id':2,'name':'Priya Patel','roll':'CS21002','section':'CS-3A','attendance':67,'last_score':72,'photo':None},
-            {'id':3,'name':'Rohan Verma','roll':'CS21003','section':'CS-3B','attendance':91,'last_score':91,'photo':None},
-            {'id':4,'name':'Sneha Rao','roll':'CS21004','section':'CS-3B','attendance':55,'last_score':63,'photo':None}
-          ]) %}
+          {% for student in students %}
           <tr>
             <td class="ps-3">
-              {% if student.photo %}
-              <img src="{{ student.photo }}" class="rounded-circle" width="40" height="40" style="object-fit:cover;" alt="{{ student.name }}">
+              {% if student.user and student.user.profile_photo %}
+              <img src="{{ student.user.profile_photo }}" class="rounded-circle" width="40" height="40" style="object-fit:cover;" alt="Photo">
               {% else %}
               <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
                 <i class="bi bi-person-fill text-secondary"></i>
               </div>
               {% endif %}
             </td>
-            <td class="fw-semibold">{{ student.name }}</td>
-            <td><code>{{ student.roll }}</code></td>
-            <td><span class="badge bg-light text-dark border">{{ student.section }}</span></td>
+            <td class="fw-semibold">{{ student.user.get_full_name() if student.user else (student.name or 'Student') }}</td>
+            <td><code>{{ student.student_roll_number or student.enrollment_number or (student.roll or 'N/A') }}</code></td>
+            <td><span class="badge bg-light text-dark border">{{ student.current_class_section.section_name if student.current_class_section else (student.section or 'N/A') }}</span></td>
             <td>
+              {% set att_pct = student.get_attendance_percentage() if student.get_attendance_percentage else (student.attendance or 0) %}
               <div class="d-flex align-items-center gap-2">
                 <div class="progress flex-grow-1" style="height:6px;max-width:80px;">
-                  <div class="progress-bar {% if student.attendance >= 75 %}bg-success{% elif student.attendance >= 60 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ student.attendance }}%;"></div>
+                  <div class="progress-bar {% if att_pct >= 75 %}bg-success{% elif att_pct >= 60 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ att_pct }}%;"></div>
                 </div>
-                <span class="small {% if student.attendance >= 75 %}text-success{% elif student.attendance >= 60 %}text-warning{% else %}text-danger{% endif %} fw-bold">{{ student.attendance }}%</span>
+                <span class="small {% if att_pct >= 75 %}text-success{% elif att_pct >= 60 %}text-warning{% else %}text-danger{% endif %} fw-bold">{{ att_pct }}%</span>
               </div>
             </td>
             <td>
-              <span class="badge {% if student.last_score >= 80 %}bg-success{% elif student.last_score >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ student.last_score }}</span>
+              <span class="badge bg-success">Active</span>
             </td>
             <td>
               <a href="/faculty/students/{{ student.id }}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-person-lines-fill me-1"></i>View Profile
               </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center py-4 text-muted">
+              <i class="bi bi-info-circle me-1"></i>No students found.
             </td>
           </tr>
           {% endfor %}

@@ -25,8 +25,8 @@
               <label class="form-label fw-semibold small">Class Section <span class="text-danger">*</span></label>
               <select id="sectionSelect" name="section" class="form-select" required>
                 <option value="">-- Select Section --</option>
-                {% for section in assigned_sections | default(['CS-3A','CS-3B','CS-4A','CS-4B']) %}
-                <option value="{{ section }}">{{ section }}</option>
+                {% for section in assigned_sections %}
+                <option value="{{ section.id }}">{{ section.section_name or section.name }} {% if section.department %}({{ section.department.name }}){% endif %}</option>
                 {% endfor %}
               </select>
             </div>
@@ -34,11 +34,7 @@
               <label class="form-label fw-semibold small">Subject <span class="text-danger">*</span></label>
               <select id="subjectSelect" name="subject" class="form-select" required>
                 <option value="">-- Select Subject --</option>
-                {% for subj in assigned_subjects | default([
-                  {'id':1,'name':'Data Structures','code':'CS301'},
-                  {'id':2,'name':'Algorithms','code':'CS302'},
-                  {'id':3,'name':'DBMS','code':'CS303'}
-                ]) %}
+                {% for subj in assigned_subjects %}
                 <option value="{{ subj.id }}">{{ subj.code }} - {{ subj.name }}</option>
                 {% endfor %}
               </select>
@@ -49,7 +45,7 @@
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold small">Session Type</label>
-              <select name="session_type" class="form-select">
+              <select id="sessionTypeSelect" name="session_type" class="form-select">
                 <option value="lecture">Lecture</option>
                 <option value="lab">Lab</option>
                 <option value="tutorial">Tutorial</option>
@@ -69,17 +65,13 @@
     <div class="card border-0 shadow-sm" id="attendanceTableCard" style="display:none!important;">
       <div class="card-header bg-white border-bottom py-3 d-flex align-items-center justify-content-between">
         <h6 class="mb-0 fw-bold"><i class="bi bi-table me-2" style="color:#0d6e6e;"></i>Step 2: Mark Attendance</h6>
-        <button class="btn btn-sm btn-success" onclick="markAllPresent()">
+        <button class="btn btn-sm btn-success" type="button" onclick="markAllPresent()">
           <i class="bi bi-check-all me-1"></i>Mark All Present
         </button>
       </div>
       <div class="card-body p-0">
-        <form id="attendanceForm" action="/faculty/api/attendance/mark" method="POST">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
-          <input type="hidden" name="section" id="hiddenSection">
-          <input type="hidden" name="subject" id="hiddenSubject">
-          <input type="hidden" name="date" id="hiddenDate">
-          <input type="hidden" name="session_type" id="hiddenSessionType">
+        <form id="attendanceForm">
+          <input type="hidden" name="session_id" id="hiddenSessionId">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="attendanceTable">
               <thead class="table-light">
@@ -100,7 +92,7 @@
             </table>
           </div>
           <div class="card-footer bg-white border-top py-3 px-3 d-flex gap-2">
-            <button type="submit" class="btn" style="background:#0d6e6e;color:#fff;">
+            <button type="submit" id="saveAttendanceBtn" class="btn" style="background:#0d6e6e;color:#fff;">
               <i class="bi bi-check-circle me-2"></i>Save Attendance
             </button>
             <button type="reset" class="btn btn-outline-secondary" onclick="resetForm()">Reset</button>
@@ -133,18 +125,17 @@
               </tr>
             </thead>
             <tbody>
-              {% for session in recent_sessions | default([
-                {'date':'01 Nov','subject':'Data Structures','section':'CS-3A','total':35,'present':32},
-                {'date':'31 Oct','subject':'Algorithms','section':'CS-3B','total':30,'present':28},
-                {'date':'30 Oct','subject':'DBMS','section':'CS-4A','total':40,'present':37},
-                {'date':'29 Oct','subject':'Data Structures','section':'CS-3A','total':35,'present':30}
-              ]) %}
+              {% for session in recent_sessions %}
               <tr>
-                <td class="ps-2 small text-muted">{{ session.date }}</td>
-                <td class="small fw-semibold">{{ session.subject }}</td>
+                <td class="ps-2 small text-muted">{{ session.session_date.strftime('%d %b') if session.session_date else '' }}</td>
+                <td class="small fw-semibold">{{ session.subject.name if session.subject else 'Subject' }}</td>
                 <td>
-                  <span class="badge bg-success">{{ session.present }}/{{ session.total }}</span>
+                  <span class="badge bg-success">Recorded</span>
                 </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" class="text-center text-muted small py-3">No recent attendance sessions found.</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -157,12 +148,12 @@
 
 <script>
 function loadStudents() {
-  const section = document.getElementById('sectionSelect').value;
-  const subject = document.getElementById('subjectSelect').value;
+  const sectionId = document.getElementById('sectionSelect').value;
+  const subjectId = document.getElementById('subjectSelect').value;
   const date = document.getElementById('attendanceDate').value;
-  const sessionType = document.querySelector('[name=session_type]').value;
+  const sessionType = document.getElementById('sessionTypeSelect').value;
 
-  if (!section || !subject || !date) {
+  if (!sectionId || !subjectId || !date) {
     alert('Please select Section, Subject, and Date.');
     return;
   }
@@ -170,51 +161,49 @@ function loadStudents() {
   document.getElementById('loadingPlaceholder').style.display = 'block';
   document.getElementById('attendanceTableCard').style.display = 'none';
 
-  fetch(`/faculty/api/students?section=${encodeURIComponent(section)}&subject=${encodeURIComponent(subject)}&date=${encodeURIComponent(date)}`)
+  fetch(`/faculty/api/attendance-session?class_section_id=${encodeURIComponent(sectionId)}&subject_id=${encodeURIComponent(subjectId)}&date=${encodeURIComponent(date)}&session_type=${encodeURIComponent(sessionType)}`)
     .then(r => r.json())
     .then(data => {
-      document.getElementById('hiddenSection').value = section;
-      document.getElementById('hiddenSubject').value = subject;
-      document.getElementById('hiddenDate').value = date;
-      document.getElementById('hiddenSessionType').value = sessionType;
-      renderStudentRows(data.students || sampleStudents);
       document.getElementById('loadingPlaceholder').style.display = 'none';
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+      document.getElementById('hiddenSessionId').value = data.session_id;
+      renderStudentRows(data.students || []);
       document.getElementById('attendanceTableCard').style.removeProperty('display');
     })
-    .catch(() => {
-      renderStudentRows(sampleStudents);
+    .catch(err => {
       document.getElementById('loadingPlaceholder').style.display = 'none';
-      document.getElementById('attendanceTableCard').style.removeProperty('display');
+      alert('Failed to load students. Please check your network or server logs.');
     });
 }
-
-const sampleStudents = [
-  {id:1, name:'Aarav Sharma', roll:'CS21001'},
-  {id:2, name:'Priya Patel', roll:'CS21002'},
-  {id:3, name:'Rohan Verma', roll:'CS21003'},
-  {id:4, name:'Sneha Rao', roll:'CS21004'},
-  {id:5, name:'Karan Mehta', roll:'CS21005'}
-];
 
 function renderStudentRows(students) {
   const tbody = document.getElementById('studentRows');
   tbody.innerHTML = '';
+  if (!students || students.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><i class="bi bi-info-circle me-1"></i>No active students enrolled in this section.</td></tr>';
+    return;
+  }
   students.forEach((s, idx) => {
+    const st = (s.status || 'present').toLowerCase();
+    const sid = s.student_id || s.id;
     tbody.innerHTML += `
       <tr>
         <td class="ps-3 text-muted small">${idx + 1}</td>
         <td class="fw-semibold">${s.name}</td>
-        <td><code>${s.roll}</code></td>
+        <td><code>${s.enrollment_number || s.roll || 'N/A'}</code></td>
         ${['present','absent','late','leave'].map(status => `
           <td class="text-center">
             <div class="form-check d-flex justify-content-center">
-              <input class="form-check-input" type="radio" name="status_${s.id}" value="${status}" ${status === 'present' ? 'checked' : ''} id="${status}_${s.id}">
+              <input class="form-check-input" type="radio" name="status_${sid}" value="${status}" ${status === st ? 'checked' : ''} id="${status}_${sid}">
             </div>
           </td>
         `).join('')}
         <td>
-          <input type="text" name="remark_${s.id}" class="form-control form-control-sm" placeholder="Optional remark..." style="min-width:120px;">
-          <input type="hidden" name="student_ids[]" value="${s.id}">
+          <input type="text" name="remark_${sid}" class="form-control form-control-sm" placeholder="Optional remark..." style="min-width:120px;">
+          <input type="hidden" name="student_ids[]" value="${sid}">
         </td>
       </tr>`;
   });
@@ -227,22 +216,57 @@ function markAllPresent() {
 function resetForm() {
   document.getElementById('attendanceTableCard').style.display = 'none';
   document.getElementById('attendanceFilterForm').reset();
+  document.getElementById('studentRows').innerHTML = '';
+  document.getElementById('hiddenSessionId').value = '';
 }
 
 document.getElementById('attendanceForm').addEventListener('submit', function(e) {
   e.preventDefault();
-  const formData = new FormData(this);
-  fetch(this.action, { method:'POST', body: formData })
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        alert('Attendance saved successfully!');
-        resetForm();
-      } else {
-        alert('Error: ' + (data.message || 'Could not save attendance.'));
-      }
-    })
-    .catch(() => alert('Network error. Please try again.'));
+  const sessionId = document.getElementById('hiddenSessionId').value;
+  if (!sessionId) {
+    alert('No active attendance session. Please load students first.');
+    return;
+  }
+
+  const studentIdInputs = document.querySelectorAll('input[name="student_ids[]"]');
+  if (studentIdInputs.length === 0) {
+    alert('No students to mark attendance for.');
+    return;
+  }
+
+  const records = Array.from(studentIdInputs).map(el => {
+    const id = parseInt(el.value);
+    const checkedRadio = document.querySelector(`input[name="status_${id}"]:checked`);
+    return {
+      student_id: id,
+      status: checkedRadio ? checkedRadio.value : 'absent'
+    };
+  });
+
+  const btn = document.getElementById('saveAttendanceBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+  fetchWithCsrf('/faculty/api/attendance/mark', {
+    method: 'POST',
+    body: JSON.stringify({ session_id: parseInt(sessionId), records: records })
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Save Attendance';
+    if (data.success || data.message) {
+      alert(data.message || 'Attendance saved successfully!');
+      resetForm();
+    } else {
+      alert('Error: ' + (data.error || 'Could not save attendance.'));
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Save Attendance';
+    alert('Network error while saving attendance.');
+  });
 });
 </script>
 {% endblock faculty_content %}
