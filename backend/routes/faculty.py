@@ -15,6 +15,7 @@ from models import (
 from security.decorators import admin_required, faculty_required, student_required, permission_required
 from security.permissions import MARK_ATTENDANCE, MANAGE_EXAMS
 import datetime
+import json
 import uuid
 from services.s3_service import S3Service
 from werkzeug.utils import secure_filename
@@ -449,30 +450,60 @@ def examinations():
         .order_by(Exam.exam_date.desc())
         .all()
     )
-    return render_template('faculty/examinations.html', exams=exams)
-
-
-@faculty_bp.route('/examinations/create', methods=['GET', 'POST'])
+    return render_template('faculty/examinations.html', exa@faculty_bp.route('/examinations/create', methods=['GET', 'POST'])
 @login_required
 @faculty_required
 def create_exam():
     faculty = _get_current_faculty()
     assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
+    has_assignments = len(assignments) > 0
 
-    # Build dropdown data: use assigned subjects/sections if available, else show all
-    if assignments:
-        subject_ids = list({a.subject_id for a in assignments})
-        section_ids = list({a.class_section_id for a in assignments})
-        subjects = Subject.query.filter(Subject.id.in_(subject_ids), Subject.is_active == True).order_by(Subject.subject_name).all()
-        class_sections = ClassSection.query.filter(ClassSection.id.in_(section_ids)).order_by(ClassSection.section_name).all()
-    else:
-        subjects = Subject.query.filter_by(is_active=True).order_by(Subject.subject_name).all()
-        class_sections = (
+    # ----- Build cascading data -----
+    # Allowed subjects: only assigned ones, else all active
+    if has_assignments:
+        subject_ids = {a.subject_id for a in assignments}
+        section_ids = {a.class_section_id for a in assignments}
+        allowed_subjects = Subject.query.filter(Subject.id.in_(subject_ids), Subject.is_active == True).all()
+        allowed_sections = (
             ClassSection.query
-            .join(Semester, ClassSection.semester_id == Semester.id)
-            .order_by(ClassSection.section_name)
+            .filter(ClassSection.id.in_(section_ids))
             .all()
         )
+    else:
+        allowed_subjects = Subject.query.filter_by(is_active=True).all()
+        allowed_sections = ClassSection.query.all()
+
+    # Build dept list (from allowed subjects)
+    dept_ids_from_subjects = {s.department_id for s in allowed_subjects}
+    departments = Department.query.filter(Department.id.in_(dept_ids_from_subjects)).order_by(Department.department_name).all()
+
+    # Semester numbers available (1-8)
+    sem_numbers = sorted({s.semester.semester_number for s in allowed_subjects if s.semester})
+
+    # subjects_data: {dept_id: {sem_number: [{id, name, code}]}}
+    subjects_data = {}
+    for sub in allowed_subjects:
+        if not sub.semester:
+            continue
+        dk = str(sub.department_id)
+        sk = str(sub.semester.semester_number)
+        subjects_data.setdefault(dk, {}).setdefault(sk, []).append({
+            'id': sub.id,
+            'name': sub.subject_name,
+            'code': sub.subject_code,
+        })
+
+    # sections_data: {dept_id: {sem_number: [{id, name}]}}
+    sections_data = {}
+    for sec in allowed_sections:
+        if not sec.semester or not sec.department_id:
+            continue
+        dk = str(sec.department_id)
+        sk = str(sec.semester.semester_number)
+        sections_data.setdefault(dk, {}).setdefault(sk, []).append({
+            'id': sec.id,
+            'name': sec.section_name,
+        })
 
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
@@ -487,9 +518,18 @@ def create_exam():
         exam_type = request.form.get('exam_type', 'mcq').strip()
         instructions = request.form.get('instructions', '').strip()
 
+        ctx = dict(
+            assignments=assignments,
+            departments=departments,
+            sem_numbers=sem_numbers,
+            subjects_data=json.dumps(subjects_data),
+            sections_data=json.dumps(sections_data),
+            has_assignments=has_assignments,
+        )
+
         if not all([title, subject_id, class_section_id, exam_date]):
-            flash('Title, subject, class section, and start date/time are required.', 'danger')
-            return render_template('faculty/create_exam.html', assignments=assignments, subjects=subjects, class_sections=class_sections)
+            flash('Exam Title, Subject, Class Section, and Start Date/Time are required.', 'danger')
+            return render_template('faculty/create_exam.html', **ctx)
 
         # Soft auth: only enforce if faculty has assignments
         teaching_assignment = FacultyAssignment.query.filter_by(
@@ -497,14 +537,18 @@ def create_exam():
             subject_id=subject_id,
             class_section_id=class_section_id,
         ).first()
-        if assignments and not teaching_assignment:
+        if has_assignments and not teaching_assignment:
             flash('You are not assigned to this subject/class combination.', 'danger')
-            return render_template('faculty/create_exam.html', assignments=assignments, subjects=subjects, class_sections=class_sections)
+            return render_template('faculty/create_exam.html', **ctx)
 
         class_section = ClassSection.query.get_or_404(class_section_id)
         semester_id = semester_id or class_section.semester_id
         if teaching_assignment:
             academic_year_id = academic_year_id or teaching_assignment.academic_year_id
+        else:
+            # fallback: use current academic year
+            current_year = AcademicYear.query.filter_by(is_current=True).first()
+            academic_year_id = academic_year_id or (current_year.id if current_year else None)
 
         exam = Exam(
             title=title,
@@ -526,7 +570,18 @@ def create_exam():
         flash('Exam created successfully. Add questions now.', 'success')
         return redirect(url_for('faculty.exam_questions', id=exam.id))
 
-    return render_template('faculty/create_exam.html', assignments=assignments, subjects=subjects, class_sections=class_sections)
+    return render_template(
+        'faculty/create_exam.html',
+        assignments=assignments,
+        departments=departments,
+        sem_numbers=sem_numbers,
+        subjects_data=json.dumps(subjects_data),
+        sections_data=json.dumps(sections_data),
+        has_assignments=has_assignments,
+    )
+
+
+sections)
 
 
 @faculty_bp.route('/examinations/<int:id>/edit', methods=['GET', 'POST'])
