@@ -450,7 +450,10 @@ def examinations():
         .order_by(Exam.exam_date.desc())
         .all()
     )
-    return render_template('faculty/examinations.html', exa@faculty_bp.route('/examinations/create', methods=['GET', 'POST'])
+    return render_template('faculty/examinations.html', exams=exams)
+
+
+@faculty_bp.route('/examinations/create', methods=['GET', 'POST'])
 @login_required
 @faculty_required
 def create_exam():
@@ -581,7 +584,6 @@ def create_exam():
     )
 
 
-sections)
 
 
 @faculty_bp.route('/examinations/<int:id>/edit', methods=['GET', 'POST'])
