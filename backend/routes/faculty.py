@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user, login_user, logout_user
 from extensions import db
 from models import (
-    User, Student, Faculty, Subject, ClassSection, FacultyAssignment,
+    User, Student, Faculty, Subject, ClassSection, FacultyAssignment, Department,
     Attendance, AttendanceSession, Exam, ExamQuestion, ExamOption,
     ExamAttempt, Result, StudyMaterial, Assignment, Notification,
     Semester, AcademicYear
@@ -173,11 +173,51 @@ def attendance():
     if assignments:
         class_ids = list({a.class_section_id for a in assignments})
         subject_ids = list({a.subject_id for a in assignments})
-        assigned_sections = ClassSection.query.filter(ClassSection.id.in_(class_ids)).order_by(ClassSection.section_name).all()
-        assigned_subjects = Subject.query.filter(Subject.id.in_(subject_ids)).order_by(Subject.name).all()
+        assigned_sections = (
+            ClassSection.query
+            .filter(ClassSection.id.in_(class_ids))
+            .join(Department, ClassSection.department_id == Department.id)
+            .join(Semester, ClassSection.semester_id == Semester.id)
+            .order_by(Department.department_name.asc(), Semester.semester_number.asc(), ClassSection.section_name.asc())
+            .all()
+        )
+        assigned_subjects = (
+            Subject.query
+            .filter(Subject.id.in_(subject_ids))
+            .join(Department, Subject.department_id == Department.id)
+            .join(Semester, Subject.semester_id == Semester.id)
+            .order_by(Department.department_name.asc(), Semester.semester_number.asc(), Subject.subject_name.asc())
+            .all()
+        )
     else:
-        assigned_sections = ClassSection.query.order_by(ClassSection.section_name).all()
-        assigned_subjects = Subject.query.order_by(Subject.name).all()
+        assigned_sections = (
+            ClassSection.query
+            .join(Department, ClassSection.department_id == Department.id)
+            .join(Semester, ClassSection.semester_id == Semester.id)
+            .order_by(Department.department_name.asc(), Semester.semester_number.asc(), ClassSection.section_name.asc())
+            .all()
+        )
+        assigned_subjects = (
+            Subject.query
+            .join(Department, Subject.department_id == Department.id)
+            .join(Semester, Subject.semester_id == Semester.id)
+            .order_by(Department.department_name.asc(), Semester.semester_number.asc(), Subject.subject_name.asc())
+            .all()
+        )
+
+    sections_by_dept = {}
+    for s in assigned_sections:
+        dept_name = s.department.name if s.department else "General"
+        if dept_name not in sections_by_dept:
+            sections_by_dept[dept_name] = []
+        sections_by_dept[dept_name].append(s)
+
+    subjects_by_dept = {}
+    for sub in assigned_subjects:
+        dept_name = sub.department.name if sub.department else "General"
+        if dept_name not in subjects_by_dept:
+            subjects_by_dept[dept_name] = []
+        subjects_by_dept[dept_name].append(sub)
 
     today = datetime.date.today().isoformat()
     recent_sessions = (
@@ -194,6 +234,8 @@ def attendance():
         assignments=assignments,
         assigned_sections=assigned_sections,
         assigned_subjects=assigned_subjects,
+        sections_by_dept=sections_by_dept,
+        subjects_by_dept=subjects_by_dept,
         today=today,
         recent_sessions=recent_sessions,
     )

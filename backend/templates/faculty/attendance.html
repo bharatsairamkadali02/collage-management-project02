@@ -23,10 +23,16 @@
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label fw-semibold small">Class Section <span class="text-danger">*</span></label>
-              <select id="sectionSelect" name="section" class="form-select" required>
+              <select id="sectionSelect" name="section" class="form-select" required onchange="filterSubjectsBySection()">
                 <option value="">-- Select Section --</option>
-                {% for section in assigned_sections %}
-                <option value="{{ section.id }}">{{ section.section_name or section.name }} {% if section.department %}({{ section.department.name }}){% endif %}</option>
+                {% for dept_name, sections in sections_by_dept.items() %}
+                <optgroup label="{{ dept_name }}">
+                  {% for section in sections %}
+                  <option value="{{ section.id }}" data-department="{{ section.department_id }}" data-semester="{{ section.semester_id }}">
+                    Semester {{ section.semester.semester_number if section.semester else '1' }} &bull; Section {{ section.section_name or section.name }}
+                  </option>
+                  {% endfor %}
+                </optgroup>
                 {% endfor %}
               </select>
             </div>
@@ -34,10 +40,19 @@
               <label class="form-label fw-semibold small">Subject <span class="text-danger">*</span></label>
               <select id="subjectSelect" name="subject" class="form-select" required>
                 <option value="">-- Select Subject --</option>
-                {% for subj in assigned_subjects %}
-                <option value="{{ subj.id }}">{{ subj.code }} - {{ subj.name }}</option>
+                {% for dept_name, subjects in subjects_by_dept.items() %}
+                <optgroup label="{{ dept_name }}">
+                  {% for subj in subjects %}
+                  <option value="{{ subj.id }}" data-department="{{ subj.department_id }}" data-semester="{{ subj.semester_id }}">
+                    {{ subj.code }} - {{ subj.name }} (Sem {{ subj.semester.semester_number if subj.semester else '1' }})
+                  </option>
+                  {% endfor %}
+                </optgroup>
                 {% endfor %}
               </select>
+              <div class="form-text text-muted" id="subjectHelpText" style="font-size:0.75rem;">
+                <i class="bi bi-funnel me-1"></i>Subjects auto-filter based on the selected Class Section.
+              </div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold small">Date <span class="text-danger">*</span></label>
@@ -121,7 +136,7 @@
               <tr>
                 <th class="ps-2 small">Date</th>
                 <th class="small">Subject</th>
-                <th class="small">Present</th>
+                <th class="small">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -147,6 +162,52 @@
 </div>
 
 <script>
+function filterSubjectsBySection() {
+  const sectionSelect = document.getElementById('sectionSelect');
+  const selectedOption = sectionSelect.options[sectionSelect.selectedIndex];
+  const subjectSelect = document.getElementById('subjectSelect');
+
+  if (!selectedOption || !selectedOption.value) {
+    // If no section chosen, show all options and optgroups
+    subjectSelect.querySelectorAll('option').forEach(opt => {
+      opt.hidden = false;
+      opt.disabled = false;
+    });
+    subjectSelect.querySelectorAll('optgroup').forEach(grp => grp.hidden = false);
+    return;
+  }
+
+  const deptId = selectedOption.getAttribute('data-department');
+  const semId = selectedOption.getAttribute('data-semester');
+
+  let firstMatch = null;
+  subjectSelect.querySelectorAll('option').forEach(opt => {
+    if (!opt.value) return; // Keep "-- Select Subject --"
+    const optDept = opt.getAttribute('data-department');
+    const optSem = opt.getAttribute('data-semester');
+
+    const match = (optDept === deptId && (!semId || optSem === semId));
+    opt.hidden = !match;
+    opt.disabled = !match;
+    if (match && !firstMatch) {
+      firstMatch = opt;
+    }
+  });
+
+  // Hide optgroups that have no matching visible options
+  subjectSelect.querySelectorAll('optgroup').forEach(grp => {
+    const visibleCount = grp.querySelectorAll('option:not([hidden])').length;
+    grp.hidden = visibleCount === 0;
+  });
+
+  // Automatically select the first matching subject for convenience
+  if (firstMatch) {
+    subjectSelect.value = firstMatch.value;
+  } else {
+    subjectSelect.value = '';
+  }
+}
+
 function loadStudents() {
   const sectionId = document.getElementById('sectionSelect').value;
   const subjectId = document.getElementById('subjectSelect').value;
@@ -218,6 +279,7 @@ function resetForm() {
   document.getElementById('attendanceFilterForm').reset();
   document.getElementById('studentRows').innerHTML = '';
   document.getElementById('hiddenSessionId').value = '';
+  filterSubjectsBySection();
 }
 
 document.getElementById('attendanceForm').addEventListener('submit', function(e) {
