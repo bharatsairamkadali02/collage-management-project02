@@ -142,22 +142,53 @@ def student_details(student_id):
     faculty = _get_current_faculty()
     student = Student.query.get_or_404(student_id)
 
-    # Ensure faculty teaches at least one class the student belongs to.
-    assignments = FacultyAssignment.query.filter_by(
-        faculty_id=faculty.id,
-        class_section_id=student.class_section_id,
-    ).first()
-    if not assignments:
-        abort(403)
+    # Soft authorization: only block if faculty HAS assignments but none match
+    # this student's section. If faculty has NO assignments at all, allow access.
+    faculty_assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
+    if faculty_assignments:
+        class_ids = {a.class_section_id for a in faculty_assignments}
+        if student.current_class_section_id not in class_ids:
+            abort(403)
+
+    # Build per-subject attendance summary
+    att_records = Attendance.query.filter_by(student_id=student_id).all()
+    subjects_map = {}
+    for r in att_records:
+        sub = r.session.subject if hasattr(r, 'session') and r.session else None
+        if not sub:
+            continue
+        sid = sub.id
+        if sid not in subjects_map:
+            subjects_map[sid] = {'name': sub.subject_name or sub.name, 'total': 0, 'present': 0, 'absent': 0, 'late': 0}
+        subjects_map[sid]['total'] += 1
+        status = (r.status or '').strip().lower()
+        if status == 'present':
+            subjects_map[sid]['present'] += 1
+        elif status == 'absent':
+            subjects_map[sid]['absent'] += 1
+        elif status in ('late', 'leave'):
+            subjects_map[sid]['late'] += 1
+    attendance_subjects = list(subjects_map.values())
 
     results = Result.query.filter_by(student_id=student_id).all()
-    attendance_records = Attendance.query.filter_by(student_id=student_id).all()
+    exam_attempts = ExamAttempt.query.filter_by(student_id=student_id).order_by(ExamAttempt.created_at.desc()).all()
+
+    overall_pct = 0
+    if att_records:
+        try:
+            overall_pct = student.get_attendance_percentage()
+        except Exception:
+            total = sum(s['total'] for s in attendance_subjects)
+            present = sum(s['present'] for s in attendance_subjects)
+            overall_pct = round((present / total) * 100, 1) if total else 0
 
     return render_template(
         'faculty/student_details.html',
         student=student,
         results=results,
-        attendance_records=attendance_records,
+        exam_attempts=exam_attempts,
+        attendance_subjects=attendance_subjects,
+        overall_pct=overall_pct,
     )
 
 
