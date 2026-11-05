@@ -8,7 +8,7 @@
     <h5 class="fw-bold mb-1">Examinations</h5>
     <p class="text-muted mb-0 small">Create, manage and publish online examinations</p>
   </div>
-  <a href="/faculty/examinations/create" class="btn" style="background:#0d6e6e;color:#fff;">
+  <a href="/faculty/examinations/create" class="btn btn-success">
     <i class="bi bi-plus-circle me-2"></i>Create New Exam
   </a>
 </div>
@@ -16,15 +16,15 @@
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body">
-    <form method="GET" class="row g-3 align-items-end">
+    <form method="GET" action="/faculty/examinations" class="row g-3 align-items-end">
       <div class="col-md-3">
         <label class="form-label fw-semibold small">Subject</label>
         <select name="subject" class="form-select">
           <option value="">All Subjects</option>
-          {% for subj in assigned_subjects | default([
-            {'id':1,'name':'Data Structures'},{'id':2,'name':'Algorithms'},{'id':3,'name':'DBMS'}
-          ]) %}
-          <option value="{{ subj.id }}" {% if request.args.get('subject') == subj.id|string %}selected{% endif %}>{{ subj.name }}</option>
+          {% for subj in assigned_subjects %}
+          <option value="{{ subj.id }}" {% if request.args.get('subject') == subj.id|string %}selected{% endif %}>
+            {{ subj.subject_name }} ({{ subj.subject_code }})
+          </option>
           {% endfor %}
         </select>
       </div>
@@ -32,8 +32,14 @@
         <label class="form-label fw-semibold small">Class Section</label>
         <select name="section" class="form-select">
           <option value="">All Sections</option>
-          {% for section in assigned_sections | default(['CS-3A','CS-3B','CS-4A']) %}
-          <option value="{{ section }}" {% if request.args.get('section') == section %}selected{% endif %}>{{ section }}</option>
+          {% for sec in assigned_sections %}
+          <option value="{{ sec.id }}" {% if request.args.get('section') == sec.id|string %}selected{% endif %}>
+            {% if sec.semester and sec.semester.department %}
+              {{ sec.semester.department.department_code or sec.semester.department.department_name }} - Sem {{ sec.semester.semester_number }} {{ sec.section_name }}
+            {% else %}
+              Section {{ sec.section_name }}
+            {% endif %}
+          </option>
           {% endfor %}
         </select>
       </div>
@@ -41,14 +47,14 @@
         <label class="form-label fw-semibold small">Status</label>
         <select name="status" class="form-select">
           <option value="">All Statuses</option>
-          <option value="draft" {% if request.args.get('status')=='draft' %}selected{% endif %}>Draft</option>
-          <option value="published" {% if request.args.get('status')=='published' %}selected{% endif %}>Published</option>
-          <option value="active" {% if request.args.get('status')=='active' %}selected{% endif %}>Active</option>
-          <option value="closed" {% if request.args.get('status')=='closed' %}selected{% endif %}>Closed</option>
+          <option value="draft" {% if request.args.get('status') == 'draft' %}selected{% endif %}>Draft</option>
+          <option value="published" {% if request.args.get('status') == 'published' %}selected{% endif %}>Published</option>
+          <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+          <option value="closed" {% if request.args.get('status') == 'closed' %}selected{% endif %}>Closed</option>
         </select>
       </div>
       <div class="col-md-3 d-flex gap-2">
-        <button type="submit" class="btn flex-grow-1" style="background:#0d6e6e;color:#fff;">Filter</button>
+        <button type="submit" class="btn btn-success flex-grow-1">Filter</button>
         <a href="/faculty/examinations" class="btn btn-outline-secondary">Reset</a>
       </div>
     </form>
@@ -57,8 +63,8 @@
 
 <!-- Examinations Table -->
 <div class="card border-0 shadow-sm">
-  <div class="card-header bg-white border-bottom py-3">
-    <h6 class="mb-0 fw-bold"><i class="bi bi-clipboard-check me-2" style="color:#0d6e6e;"></i>All Examinations</h6>
+  <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-bold"><i class="bi bi-clipboard-check me-2 text-success"></i>All Examinations ({{ exams|length }})</h6>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -67,31 +73,52 @@
           <tr>
             <th class="ps-3">Title</th>
             <th>Subject</th>
-            <th>Class</th>
-            <th>Start</th>
-            <th>End</th>
+            <th>Class Section</th>
+            <th>Start Window</th>
             <th>Duration</th>
-            <th>Questions</th>
-            <th>Max Marks</th>
+            <th class="text-center">Questions</th>
+            <th class="text-center">Max Marks</th>
             <th>Status</th>
-            <th>Actions</th>
+            <th class="text-end pe-3">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {% for exam in exams | default([
-            {'id':1,'title':'Mid-Term DS','subject':'Data Structures','section':'CS-3A','start':'15 Nov 10:00','end':'15 Nov 11:00','duration':60,'questions':30,'max_marks':100,'status':'published'},
-            {'id':2,'title':'Algo Unit Test','subject':'Algorithms','section':'CS-3B','start':'18 Nov 14:00','end':'18 Nov 14:45','duration':45,'questions':20,'max_marks':50,'status':'draft'},
-            {'id':3,'title':'DBMS Quiz 3','subject':'DBMS','section':'CS-4A','start':'20 Nov 11:00','end':'20 Nov 11:30','duration':30,'questions':15,'max_marks':30,'status':'closed'}
-          ]) %}
+          {% for exam in exams %}
           <tr>
-            <td class="ps-3 fw-semibold">{{ exam.title }}</td>
-            <td class="text-muted small">{{ exam.subject }}</td>
-            <td><span class="badge bg-light text-dark border">{{ exam.section }}</span></td>
-            <td class="small text-muted">{{ exam.start }}</td>
-            <td class="small text-muted">{{ exam.end }}</td>
-            <td class="small">{{ exam.duration }} min</td>
-            <td class="text-center">{{ exam.questions }}</td>
-            <td class="text-center">{{ exam.max_marks }}</td>
+            <td class="ps-3 fw-semibold">
+              <a href="/faculty/examinations/{{ exam.id }}/questions" class="text-decoration-none text-dark">
+                {{ exam.title }}
+              </a>
+            </td>
+            <td class="text-muted small">
+              {% if exam.subject %}
+                <span class="fw-semibold text-dark">{{ exam.subject.subject_name }}</span>
+                <span class="d-block text-secondary" style="font-size:0.75rem;">{{ exam.subject.subject_code }}</span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">
+                {% if exam.class_section %}
+                  {% if exam.class_section.semester and exam.class_section.semester.department %}
+                    {{ exam.class_section.semester.department.department_code or exam.class_section.semester.department.department_name }} Sem {{ exam.class_section.semester.semester_number }} - Sec {{ exam.class_section.section_name }}
+                  {% else %}
+                    Section {{ exam.class_section.section_name }}
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </span>
+            </td>
+            <td class="small text-muted">
+              {{ exam.start_time.strftime('%d %b %Y, %I:%M %p') if exam.start_time else '—' }}
+            </td>
+            <td class="small">{{ exam.duration_minutes }} min</td>
+            <td class="text-center">
+              <span class="badge bg-light text-dark border px-2 py-1">{{ exam.questions.count() }}</span>
+            </td>
+            <td class="text-center fw-semibold">{{ exam.total_marks | int }}</td>
             <td>
               {% if exam.status == 'published' %}
                 <span class="badge bg-success">Published</span>
@@ -103,36 +130,44 @@
                 <span class="badge bg-dark">Closed</span>
               {% endif %}
             </td>
-            <td>
-              <div class="d-flex gap-1 flex-wrap">
-                <a href="/faculty/examinations/{{ exam.id }}/questions" class="btn btn-xs btn-outline-primary" style="font-size:0.72rem;padding:2px 7px;" title="Manage Questions"><i class="bi bi-question-circle"></i></a>
-                <a href="/faculty/examinations/{{ exam.id }}/edit" class="btn btn-xs btn-outline-secondary" style="font-size:0.72rem;padding:2px 7px;" title="Edit"><i class="bi bi-pencil"></i></a>
+            <td class="text-end pe-3">
+              <div class="d-inline-flex gap-1">
+                <a href="/faculty/examinations/{{ exam.id }}/questions" class="btn btn-sm btn-outline-primary" title="Manage Questions">
+                  <i class="bi bi-question-circle me-1"></i>Questions
+                </a>
                 {% if exam.status == 'draft' %}
-                <form method="POST" action="/faculty/examinations/{{ exam.id }}/publish" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
-                  <button class="btn btn-xs btn-outline-success" style="font-size:0.72rem;padding:2px 7px;" title="Publish"><i class="bi bi-send"></i></button>
+                <form method="POST" action="/faculty/examinations/{{ exam.id }}/publish" class="d-inline" onsubmit="return confirm('Publish this exam? Students will be able to see it.')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-outline-success" title="Publish Exam">
+                    <i class="bi bi-send me-1"></i>Publish
+                  </button>
                 </form>
                 {% endif %}
-                {% if exam.status in ['published','active'] %}
-                <form method="POST" action="/faculty/examinations/{{ exam.id }}/close" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
-                  <button class="btn btn-xs btn-outline-danger" style="font-size:0.72rem;padding:2px 7px;" title="Close"><i class="bi bi-x-circle"></i></button>
+                {% if exam.status in ['published', 'active'] %}
+                <form method="POST" action="/faculty/examinations/{{ exam.id }}/close" class="d-inline" onsubmit="return confirm('Close this exam?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Close Exam">
+                    <i class="bi bi-x-circle me-1"></i>Close
+                  </button>
                 </form>
                 {% endif %}
-                <a href="/faculty/examinations/{{ exam.id }}/results" class="btn btn-xs btn-outline-info" style="font-size:0.72rem;padding:2px 7px;" title="View Results"><i class="bi bi-bar-chart"></i></a>
+                <a href="/faculty/examinations/{{ exam.id }}/attempts" class="btn btn-sm btn-outline-secondary" title="View Student Attempts">
+                  <i class="bi bi-people"></i>
+                </a>
               </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="text-center py-5 text-muted">
+              <i class="bi bi-clipboard-x fs-1 d-block mb-2"></i>
+              No examinations found matching your filter criteria. <a href="/faculty/examinations/create">Create one now.</a>
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% if not exams %}
-    <div class="text-center py-5 text-muted">
-      <i class="bi bi-clipboard-x fs-1 d-block mb-2"></i>
-      No examinations found. <a href="/faculty/examinations/create">Create one now.</a>
-    </div>
-    {% endif %}
   </div>
 </div>
 {% endblock faculty_content %}

@@ -444,13 +444,41 @@ def api_attendance_report():
 @faculty_required
 def examinations():
     faculty = _get_current_faculty()
-    exams = (
-        Exam.query
-        .filter_by(created_by_faculty_id=faculty.id)
-        .order_by(Exam.exam_date.desc())
-        .all()
+
+    assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
+    if assignments:
+        assigned_subjects = Subject.query.filter(
+            Subject.id.in_([a.subject_id for a in assignments]),
+            Subject.is_active == True
+        ).order_by(Subject.subject_name).all()
+        assigned_sections = ClassSection.query.filter(
+            ClassSection.id.in_([a.class_section_id for a in assignments])
+        ).order_by(ClassSection.section_name).all()
+    else:
+        assigned_subjects = Subject.query.filter_by(is_active=True).order_by(Subject.subject_name).all()
+        assigned_sections = ClassSection.query.order_by(ClassSection.section_name).all()
+
+    query = Exam.query.filter_by(created_by_faculty_id=faculty.id)
+
+    subject_filter = request.args.get('subject', type=int)
+    section_filter = request.args.get('section', type=int)
+    status_filter = request.args.get('status', '').strip()
+
+    if subject_filter:
+        query = query.filter(Exam.subject_id == subject_filter)
+    if section_filter:
+        query = query.filter(Exam.class_section_id == section_filter)
+    if status_filter:
+        query = query.filter(Exam.status == status_filter)
+
+    exams = query.order_by(Exam.start_time.desc()).all()
+
+    return render_template(
+        'faculty/examinations.html',
+        exams=exams,
+        assigned_subjects=assigned_subjects,
+        assigned_sections=assigned_sections,
     )
-    return render_template('faculty/examinations.html', exams=exams)
 
 
 @faculty_bp.route('/examinations/create', methods=['GET', 'POST'])
@@ -619,11 +647,17 @@ def publish_exam(id):
 
     question_count = ExamQuestion.query.filter_by(exam_id=id).count()
     if question_count == 0:
-        return jsonify({'error': 'Cannot publish an exam with no questions.'}), 400
+        if request.is_json:
+            return jsonify({'error': 'Cannot publish an exam with no questions.'}), 400
+        flash('Cannot publish an exam with no questions. Please add questions first.', 'warning')
+        return redirect(url_for('faculty.exam_questions', id=id))
 
     exam.status = 'published'
     db.session.commit()
-    return jsonify({'message': 'Exam published.'}), 200
+    if request.is_json:
+        return jsonify({'message': 'Exam published.'}), 200
+    flash('Exam published successfully.', 'success')
+    return redirect(url_for('faculty.examinations'))
 
 
 @faculty_bp.route('/examinations/<int:id>/close', methods=['POST'])
@@ -636,7 +670,10 @@ def close_exam(id):
         abort(403)
     exam.status = 'closed'
     db.session.commit()
-    return jsonify({'message': 'Exam closed.'}), 200
+    if request.is_json:
+        return jsonify({'message': 'Exam closed.'}), 200
+    flash('Exam closed.', 'info')
+    return redirect(url_for('faculty.examinations'))
 
 
 @faculty_bp.route('/examinations/<int:id>/questions')
