@@ -55,7 +55,7 @@
 </div>
 
 <!-- Add Question Modal -->
-<div class="modal fade" id="addQuestionModal" tabindex="-1">
+<div class="modal fade" id="addQuestionModal" tabindex="-1" data-bs-backdrop="false" style="background: rgba(0, 0, 0, 0.55); z-index: 1060;">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
@@ -142,4 +142,34 @@ function deleteQuestion(id) {
   }
 }
 </script>
+
+<style>
+  #addQuestionModal {
+    z-index: 1060 !important;
+  }
+  #addQuestionModal .modal-dialog {
+    z-index: 1061 !important;
+    position: relative;
+    margin-top: 50px;
+  }
+  #addQuestionModal .form-control:focus {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const modalEl = document.getElementById('addQuestionModal');
+  if (modalEl) {
+    modalEl.addEventListener('shown.bs.modal', function () {
+      const promptInput = modalEl.querySelector('textarea[name="question_text"]');
+      if (promptInput) {
+        promptInput.focus();
+      }
+    });
+  }
+});
+</script>
+
 {% endblock faculty_content %}
