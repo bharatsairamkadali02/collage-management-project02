@@ -680,10 +680,12 @@ def close_exam(id):
 @login_required
 @faculty_required
 def delete_exam(id):
-    faculty = _get_current_faculty()
     exam = Exam.query.get_or_404(id)
-    if exam.created_by_faculty_id and exam.created_by_faculty_id != faculty.id:
-        abort(403)
+    user_role = getattr(getattr(current_user, 'role', None), 'name', None)
+    if (user_role or '').lower() != 'admin':
+        faculty = _get_current_faculty()
+        if exam.created_by_faculty_id and exam.created_by_faculty_id != faculty.id:
+            abort(403)
     title = exam.title
     db.session.delete(exam)
     db.session.commit()
@@ -799,20 +801,24 @@ def delete_question(id):
 @login_required
 @faculty_required
 def exam_attempts(id):
+    user_role = getattr(getattr(current_user, 'role', None), 'name', None)
+    if (user_role or '').lower() == 'admin':
+        return redirect(url_for('admin.exam_attempts', id=id))
+
     faculty = _get_current_faculty()
     exam = Exam.query.get_or_404(id)
-    if exam.created_by_faculty_id != faculty.id:
+    if exam.created_by_faculty_id and exam.created_by_faculty_id != faculty.id:
         abort(403)
 
-    attempts = ExamAttempt.query.filter_by(exam_id=id).all()
+    attempts = ExamAttempt.query.filter_by(exam_id=id).order_by(ExamAttempt.created_at.desc()).all()
 
     if request.headers.get('Accept') == 'application/json':
         return jsonify([
             {
                 'attempt_id': a.id,
                 'student_id': a.student_id,
-                'score': a.score,
-                'total': a.total_marks,
+                'score': a.score_obtained,
+                'total': exam.total_marks,
                 'percentage': a.percentage,
                 'submitted_at': a.submitted_at.isoformat() if a.submitted_at else None,
                 'status': a.status,

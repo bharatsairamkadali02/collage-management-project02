@@ -1,0 +1,82 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Exam Attempts - {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="page-title"><i class="bi bi-people me-2 text-primary"></i>Exam Attempts: {{ exam.title }}</h2>
+    <p class="text-muted mb-0">
+      Subject: <strong>{{ exam.subject.subject_name if exam.subject else 'N/A' }}</strong> &bull; 
+      Class Section: <strong>{{ exam.class_section.section_name if exam.class_section else 'All' }}</strong> &bull;
+      Total Marks: <strong>{{ exam.total_marks | int }}</strong>
+    </p>
+  </div>
+  <a href="{{ url_for('admin.examinations') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i> Back to Examinations
+  </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom py-3">
+    <h6 class="mb-0 fw-bold"><i class="bi bi-journal-check me-2 text-primary"></i>Student Submissions ({{ attempts|length }})</h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Student Name</th>
+            <th>Roll No</th>
+            <th>Attempt #</th>
+            <th>Started At</th>
+            <th>Submitted At</th>
+            <th>Score</th>
+            <th>Percentage</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attempt in attempts %}
+          <tr>
+            <td class="ps-4 fw-semibold">
+              {{ attempt.student.user.get_full_name() if (attempt.student and attempt.student.user) else 'Student' }}
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">
+                {{ attempt.student.student_roll_number or attempt.student.enrollment_number if attempt.student else '—' }}
+              </span>
+            </td>
+            <td>{{ attempt.attempt_number or 1 }}</td>
+            <td class="small text-muted">{{ attempt.started_at.strftime('%d %b %Y %H:%M') if attempt.started_at else '—' }}</td>
+            <td class="small text-muted">{{ attempt.submitted_at.strftime('%d %b %Y %H:%M') if attempt.submitted_at else 'In progress' }}</td>
+            <td class="fw-bold">{{ attempt.score_obtained if attempt.score_obtained is not none else '—' }} / {{ exam.total_marks | int }}</td>
+            <td>
+              {% if attempt.percentage is not none %}
+                <span class="badge {% if attempt.percentage >= 40 %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %}">
+                  {{ attempt.percentage | round(1) }}%
+                </span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge {% if attempt.status == 'completed' %}bg-success{% elif attempt.status == 'in_progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ attempt.status | title }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-person-x fs-1 d-block mb-2"></i>
+              No student attempts found for this examination.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

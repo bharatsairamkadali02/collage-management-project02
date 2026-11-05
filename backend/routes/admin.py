@@ -706,6 +706,16 @@ def delete_exam(id):
     return redirect(url_for('admin.examinations'))
 
 
+@admin_bp.route('/examinations/<int:id>/attempts')
+@login_required
+@admin_required
+def exam_attempts(id):
+    exam = Exam.query.get_or_404(id)
+    from models.examination import ExamAttempt
+    attempts = ExamAttempt.query.filter_by(exam_id=id).order_by(ExamAttempt.created_at.desc()).all()
+    return render_template('admin/exam_attempts.html', exam=exam, attempts=attempts)
+
+
 # ---------------------------------------------------------------------------
 # Results
 # ---------------------------------------------------------------------------
