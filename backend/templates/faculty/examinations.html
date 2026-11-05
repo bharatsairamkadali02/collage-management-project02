@@ -154,6 +154,12 @@
                 <a href="/faculty/examinations/{{ exam.id }}/attempts" class="btn btn-sm btn-outline-secondary" title="View Student Attempts">
                   <i class="bi bi-people"></i>
                 </a>
+                <form method="POST" action="/faculty/examinations/{{ exam.id }}/delete" class="d-inline" onsubmit="return confirm('Are you sure you want to permanently delete examination \'{{ exam.title }}\'?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Exam">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
               </div>
             </td>
           </tr>

@@ -690,8 +690,20 @@ def attendance():
 @admin_required
 def examinations():
     page = request.args.get('page', 1, type=int)
-    exams = Exam.query.order_by(Exam.exam_date.desc()).paginate(page=page, per_page=20)
+    exams = Exam.query.order_by(Exam.start_time.desc()).paginate(page=page, per_page=20)
     return render_template('admin/examinations.html', exams=exams)
+
+
+@admin_bp.route('/examinations/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_exam(id):
+    exam = Exam.query.get_or_404(id)
+    title = exam.title
+    db.session.delete(exam)
+    db.session.commit()
+    flash(f'Examination "{title}" has been deleted successfully.', 'success')
+    return redirect(url_for('admin.examinations'))
 
 
 # ---------------------------------------------------------------------------

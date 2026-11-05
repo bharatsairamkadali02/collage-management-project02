@@ -676,6 +676,23 @@ def close_exam(id):
     return redirect(url_for('faculty.examinations'))
 
 
+@faculty_bp.route('/examinations/<int:id>/delete', methods=['POST'])
+@login_required
+@faculty_required
+def delete_exam(id):
+    faculty = _get_current_faculty()
+    exam = Exam.query.get_or_404(id)
+    if exam.created_by_faculty_id and exam.created_by_faculty_id != faculty.id:
+        abort(403)
+    title = exam.title
+    db.session.delete(exam)
+    db.session.commit()
+    if request.is_json:
+        return jsonify({'success': True, 'message': 'Exam deleted.'}), 200
+    flash(f'Examination "{title}" deleted successfully.', 'success')
+    return redirect(url_for('faculty.examinations'))
+
+
 @faculty_bp.route('/examinations/<int:id>/questions')
 @login_required
 @faculty_required
