@@ -9,10 +9,13 @@
     <div>
       <h4 class="text-white mb-1 fw-bold">Welcome, {{ current_user.get_full_name() if current_user else 'Student' }}!</h4>
       <p class="text-white-75 mb-1">
-        <span class="badge bg-white text-purple me-2" style="color:#6a1b9a;">{{ current_user.roll_number if current_user else 'CS21001' }}</span>
-        <span class="badge bg-white-50 text-white">{{ current_user.department if current_user else 'Computer Science' }}</span>
+        {% set roll = (student.student_roll_number or student.enrollment_number) if student else 'CS21001' %}
+        {% set dept = (student.department.department_name) if (student and student.department) else 'Computer Science' %}
+        {% set sem = (student.current_semester.semester_number) if (student and student.current_semester) else '1' %}
+        <span class="badge bg-white me-2" style="color:#6a1b9a;">{{ roll }}</span>
+        <span class="badge bg-white bg-opacity-25 text-white">{{ dept }}</span>
       </p>
-      <p class="text-white-75 mb-0 small"><i class="bi bi-calendar3 me-1"></i>Semester {{ current_user.semester if current_user else '5' }} &bull; {{ now.strftime('%A, %d %B %Y') if now else 'Today' }}</p>
+      <p class="text-white-75 mb-0 small"><i class="bi bi-calendar3 me-1"></i>Semester {{ sem }} &bull; {{ now.strftime('%A, %d %B %Y') if now else 'Today' }}</p>
     </div>
     <i class="bi bi-mortarboard-fill text-white" style="font-size:3rem;opacity:0.8;"></i>
   </div>

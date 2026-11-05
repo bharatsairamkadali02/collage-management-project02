@@ -1,6 +1,30 @@
 {% extends "base.html" %}
 
 {% block sidebar %}
+
+<style>
+  .sidebar .nav-link {
+    color: rgba(255, 255, 255, 0.85) !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    background: transparent !important;
+    transition: all 0.2s ease !important;
+  }
+  .sidebar .nav-link:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+  }
+  .sidebar .nav-link.active {
+    background: rgba(255, 255, 255, 0.22) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    border-left: 4px solid #80cbc4 !important;
+  }
+  .sidebar .nav-link i {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+</style>
+
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3" style="width:260px;min-height:100vh;background:linear-gradient(180deg,#0d6e6e 0%,#064f4f 100%);">
   <a href="/faculty/dashboard" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
     <i class="bi bi-mortarboard-fill fs-4 me-2"></i>
@@ -22,52 +46,52 @@
 
   <ul class="nav nav-pills flex-column mb-auto gap-1">
     <li class="nav-item">
-      <a href="/faculty/dashboard" class="nav-link text-white {% if request.path == '/faculty/dashboard' %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/dashboard" class="nav-link text-white {% if request.path == '/faculty/dashboard' %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-speedometer2 fs-5"></i> Dashboard
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/students" class="nav-link text-white {% if request.path.startswith('/faculty/students') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/students" class="nav-link text-white {% if request.path.startswith('/faculty/students') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-mortarboard fs-5"></i> My Students
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/attendance" class="nav-link text-white {% if request.path.startswith('/faculty/attendance') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/attendance" class="nav-link text-white {% if request.path.startswith('/faculty/attendance') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-calendar-check fs-5"></i> Attendance
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/examinations" class="nav-link text-white {% if request.path.startswith('/faculty/examinations') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/examinations" class="nav-link text-white {% if request.path.startswith('/faculty/examinations') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-clipboard-check fs-5"></i> Examinations
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/question-bank" class="nav-link text-white {% if request.path.startswith('/faculty/question-bank') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/question-bank" class="nav-link text-white {% if request.path.startswith('/faculty/question-bank') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-question-circle fs-5"></i> Question Bank
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/marks" class="nav-link text-white {% if request.path.startswith('/faculty/marks') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/marks" class="nav-link text-white {% if request.path.startswith('/faculty/marks') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-pencil-square fs-5"></i> Marks Entry
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/results" class="nav-link text-white {% if request.path.startswith('/faculty/results') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/results" class="nav-link text-white {% if request.path.startswith('/faculty/results') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-bar-chart-line fs-5"></i> Results
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/assignments" class="nav-link text-white {% if request.path.startswith('/faculty/assignments') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/assignments" class="nav-link text-white {% if request.path.startswith('/faculty/assignments') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-journal-bookmark fs-5"></i> Assignments
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/materials" class="nav-link text-white {% if request.path.startswith('/faculty/materials') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2">
+      <a href="/faculty/materials" class="nav-link text-white {% if request.path.startswith('/faculty/materials') %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-folder2-open fs-5"></i> Study Materials
       </a>
     </li>
     <li class="nav-item">
-      <a href="/faculty/notifications" class="nav-link text-white {% if request.path.startswith('/faculty/notifications') %}active bg-white bg-opacity-25{% endif %} d-flex align-items-center gap-2 position-relative">
+      <a href="/faculty/notifications" class="nav-link text-white {% if request.path.startswith('/faculty/notifications') %}active{% endif %} d-flex align-items-center gap-2 position-relative">
         <i class="bi bi-bell fs-5"></i> Notifications
         {% if unread_notifications_count and unread_notifications_count > 0 %}
         <span class="badge bg-danger rounded-pill ms-auto">{{ unread_notifications_count }}</span>
