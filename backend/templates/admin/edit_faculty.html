@@ -11,6 +11,12 @@
       <div class="col-md-6"><label class="form-label">Department</label><select class="form-select" name="department_id">{% for d in departments %}<option value="{{ d.id }}" {% if faculty_member.department_id == d.id %}selected{% endif %}>{{ d.department_name }}</option>{% endfor %}</select></div>
       <div class="col-md-6"><label class="form-label">Designation</label><input class="form-control" name="designation" value="{{ faculty_member.designation or '' }}"></div>
       <div class="col-md-6"><label class="form-label">Qualification</label><input class="form-control" name="qualification" value="{{ faculty_member.qualification or '' }}"></div>
+      <div class="col-md-6 d-flex align-items-center mt-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="is_hod" id="isHodSwitch" {% if faculty_member.is_hod %}checked{% endif %}>
+          <label class="form-check-label fw-semibold" for="isHodSwitch">Assign as Head of Department (HOD)</label>
+        </div>
+      </div>
     </div>
     <div class="mt-4"><button class="btn btn-primary" type="submit">Save changes</button> <a class="btn btn-outline-secondary" href="{{ url_for('admin.faculty') }}">Cancel</a></div>
   </form>

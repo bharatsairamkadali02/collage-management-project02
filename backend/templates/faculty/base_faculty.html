@@ -37,9 +37,19 @@
     <div class="rounded-circle bg-white d-flex align-items-center justify-content-center me-2" style="width:42px;height:42px;min-width:42px;">
       <i class="bi bi-person-fill text-success fs-5"></i>
     </div>
-    <div>
-      <div class="text-white fw-semibold small">{{ current_user.get_full_name() }}</div>
-      <div class="text-white-50" style="font-size:0.72rem;">Faculty</div>
+    <div class="overflow-hidden">
+      <div class="text-white fw-semibold small text-truncate">{{ current_user.get_full_name() }}</div>
+      <div class="text-white-50 d-flex align-items-center gap-1 mt-1" style="font-size:0.72rem;">
+        {% set fac = current_user.faculty_profile if current_user else none %}
+        {% if fac and fac.is_hod %}
+          <span class="badge bg-warning text-dark py-0 px-1" style="font-size:0.65rem;font-weight:700;">HOD</span>
+          <span class="text-truncate">{{ fac.department.department_code or fac.department.department_name if fac.department else 'Head of Dept' }}</span>
+        {% elif fac and fac.designation %}
+          <span class="text-truncate">{{ fac.designation }}</span>
+        {% else %}
+          <span>Professor</span>
+        {% endif %}
+      </div>
     </div>
   </div>
   {% endif %}
@@ -132,6 +142,12 @@
           <a class="btn btn-light btn-sm dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
             <i class="bi bi-person-circle fs-5"></i>
             <span class="d-none d-md-inline">{{ current_user.get_full_name() if current_user else 'Faculty' }}</span>
+            {% set fac = current_user.faculty_profile if current_user else none %}
+            {% if fac and fac.is_hod %}
+              <span class="badge bg-warning text-dark" style="font-size:0.68rem;">HOD</span>
+            {% elif fac and fac.designation %}
+              <span class="badge bg-secondary-subtle text-secondary" style="font-size:0.68rem;">{{ fac.designation }}</span>
+            {% endif %}
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="/faculty/profile"><i class="bi bi-person me-2"></i>Profile</a></li>

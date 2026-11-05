@@ -77,6 +77,31 @@ def dashboard():
         .all()
     )
 
+    # Time-based dynamic greeting (IST = UTC + 5:30)
+    ist_now = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+    hour = ist_now.hour
+    if 5 <= hour < 12:
+        greeting = "Good morning"
+        greeting_icon = "bi-sun-fill text-warning"
+    elif 12 <= hour < 17:
+        greeting = "Good afternoon"
+        greeting_icon = "bi-brightness-high-fill text-warning"
+    else:
+        greeting = "Good evening"
+        greeting_icon = "bi-moon-stars-fill text-warning"
+
+    # Department faculty / professors (highlighting HOD)
+    dept_professors = []
+    if faculty.department_id:
+        dept_professors = (
+            Faculty.query
+            .filter_by(department_id=faculty.department_id)
+            .join(User)
+            .filter(User.is_active == True)
+            .order_by(Faculty.is_hod.desc(), User.first_name.asc())
+            .all()
+        )
+
     return render_template(
         'faculty/dashboard.html',
         stats={
@@ -92,6 +117,10 @@ def dashboard():
         assigned_subjects=len(subject_ids),
         today_attendance_sessions=today_sessions,
         upcoming_exams=upcoming_exams,
+        dept_professors=dept_professors,
+        greeting=greeting,
+        greeting_icon=greeting_icon,
+        now_ist=ist_now,
     )
 
 

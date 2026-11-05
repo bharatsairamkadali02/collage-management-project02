@@ -7,10 +7,40 @@
 <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#0d6e6e,#1aab8a);">
   <div class="card-body d-flex align-items-center justify-content-between py-4 px-4">
     <div>
-      <h4 class="text-white mb-1 fw-bold">Good morning, Prof. {{ current_user.get_full_name() }}!</h4>
-      <p class="text-white-75 mb-0"><i class="bi bi-calendar3 me-1"></i>{{ now.strftime('%A, %d %B %Y') if now else 'Today' }}</p>
+      <h4 class="text-white mb-2 fw-bold d-flex flex-wrap align-items-center gap-2">
+        <span id="timeGreeting">{{ greeting | default('Good morning') }}</span>,
+        {% if faculty and faculty.is_hod %}
+          <span class="badge bg-warning text-dark align-middle"><i class="bi bi-star-fill me-1"></i>HOD</span>
+          <span>{{ current_user.get_full_name() }}</span>
+        {% elif faculty and faculty.designation and ('Dr' in faculty.designation or 'Prof' in faculty.designation) %}
+          <span>{{ faculty.designation }} {{ current_user.get_full_name() }}</span>
+        {% elif faculty and faculty.designation %}
+          <span>{{ faculty.designation }} {{ current_user.get_full_name() }}</span>
+        {% else %}
+          <span>Prof. {{ current_user.get_full_name() }}</span>
+        {% endif %}!
+      </h4>
+      <p class="text-white-75 mb-0 d-flex flex-wrap align-items-center gap-2 small">
+        {% if faculty and faculty.department %}
+          <span><i class="bi bi-building me-1"></i>{{ faculty.department.department_name }}</span>
+          <span>&bull;</span>
+        {% endif %}
+        {% if faculty and faculty.is_hod %}
+          <span class="badge bg-warning text-dark"><i class="bi bi-award-fill me-1"></i>Head of Department</span>
+          <span>&bull;</span>
+        {% elif faculty and faculty.designation %}
+          <span class="badge bg-white bg-opacity-25 text-white">{{ faculty.designation }}</span>
+          <span>&bull;</span>
+        {% else %}
+          <span class="badge bg-white bg-opacity-25 text-white">Professor</span>
+          <span>&bull;</span>
+        {% endif %}
+        <span><i class="bi bi-calendar3 me-1"></i><span id="greetingDate">{{ now_ist.strftime('%A, %d %B %Y') if now_ist else (now.strftime('%A, %d %B %Y') if now else 'Today') }}</span></span>
+      </p>
     </div>
-    <i class="bi bi-sun-fill text-warning" style="font-size:3rem;opacity:0.8;"></i>
+    <div>
+      <i id="greetingIcon" class="bi {{ greeting_icon or 'bi-sun-fill text-warning' }}" style="font-size:3.2rem;opacity:0.9;"></i>
+    </div>
   </div>
 </div>
 
@@ -206,5 +236,111 @@
       </div>
     </div>
   </div>
+
+  <!-- Department Professors & HOD -->
+  <div class="col-12 mt-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
+        <h6 class="mb-0 fw-bold">
+          <i class="bi bi-people-fill me-2" style="color:#0d6e6e;"></i>
+          Department Professors &amp; Faculty
+          {% if faculty and faculty.department %}
+            <span class="text-muted fw-normal">({{ faculty.department.department_name }})</span>
+          {% endif %}
+        </h6>
+        {% if faculty and faculty.is_hod %}
+          <span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>You are Head of Department</span>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Professor / Faculty</th>
+                <th>Employee ID</th>
+                <th>Designation</th>
+                <th>Department Role</th>
+                <th>Specialization</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for prof in dept_professors %}
+              <tr {% if prof.id == faculty.id %}class="table-active"{% endif %}>
+                <td class="ps-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width:34px;height:34px;background:{% if prof.is_hod %}#f59e0b{% else %}#0d6e6e{% endif %};font-size:0.8rem;">
+                      {{ prof.user.first_name[0] if prof.user and prof.user.first_name else 'P' }}{{ prof.user.last_name[0] if prof.user and prof.user.last_name else '' }}
+                    </div>
+                    <div>
+                      <div class="fw-semibold">
+                        {{ prof.user.get_full_name() if prof.user else 'Professor' }}
+                        {% if prof.id == faculty.id %}
+                          <span class="badge bg-secondary-subtle text-secondary small ms-1">You</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td><code>{{ prof.employee_id or '—' }}</code></td>
+                <td><span class="badge bg-light text-dark border">{{ prof.designation or 'Professor' }}</span></td>
+                <td>
+                  {% if prof.is_hod %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>HOD (Head of Department)</span>
+                  {% else %}
+                    <span class="badge bg-light text-muted border">Faculty Member</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">{{ prof.specialization or '—' }}</td>
+                <td class="small">{{ prof.user.email if prof.user else '—' }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="text-center py-4 text-muted">
+                  <i class="bi bi-person-slash fs-3 d-block mb-1"></i>
+                  No other faculty members registered in this department yet.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script>
+(function() {
+  // Sync greeting and icon dynamically with the user's browser local time
+  const now = new Date();
+  const hour = now.getHours();
+  let greeting = 'Good morning';
+  let iconClass = 'bi-sun-fill text-warning';
+
+  if (hour >= 12 && hour < 17) {
+    greeting = 'Good afternoon';
+    iconClass = 'bi-brightness-high-fill text-warning';
+  } else if (hour >= 17 || hour < 5) {
+    greeting = 'Good evening';
+    iconClass = 'bi-moon-stars-fill text-warning';
+  }
+
+  const greetingEl = document.getElementById('timeGreeting');
+  if (greetingEl) {
+    greetingEl.textContent = greeting;
+  }
+  const iconEl = document.getElementById('greetingIcon');
+  if (iconEl) {
+    iconEl.className = 'bi ' + iconClass;
+  }
+
+  const dateEl = document.getElementById('greetingDate');
+  if (dateEl) {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString(undefined, options);
+  }
+})();
+</script>
 {% endblock faculty_content %}

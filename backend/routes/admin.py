@@ -278,6 +278,11 @@ def faculty():
         )
     if department_id:
         query = query.filter(Faculty.department_id == department_id)
+    role_filter = request.args.get('role_filter', '').strip()
+    if role_filter == 'hod':
+        query = query.filter(Faculty.is_hod == True)
+    elif role_filter == 'faculty':
+        query = query.filter(Faculty.is_hod == False)
 
     pagination = query.order_by(User.created_at.desc()).paginate(page=page, per_page=20)
     departments = Department.query.order_by(Department.name).all()
@@ -364,6 +369,19 @@ def edit_faculty(id):
         faculty_member.department_id = request.form.get('department_id', faculty_member.department_id, type=int)
         faculty_member.designation = request.form.get('designation', faculty_member.designation).strip()
         faculty_member.qualification = request.form.get('qualification', faculty_member.qualification).strip()
+        is_hod_val = bool(request.form.get('is_hod'))
+        faculty_member.is_hod = is_hod_val
+        if faculty_member.department_id:
+            dept = Department.query.get(faculty_member.department_id)
+            if dept:
+                if is_hod_val:
+                    prev_hods = Faculty.query.filter_by(department_id=dept.id, is_hod=True).all()
+                    for h in prev_hods:
+                        if h.id != faculty_member.id:
+                            h.is_hod = False
+                    dept.hod_faculty_id = faculty_member.id
+                elif dept.hod_faculty_id == faculty_member.id:
+                    dept.hod_faculty_id = None
         db.session.commit()
 
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':

@@ -17,13 +17,13 @@
 <div class="card mb-4 border-0 shadow-sm">
   <div class="card-body">
     <form method="GET" action="{{ url_for('admin.faculty') }}" class="row g-3">
-      <div class="col-md-5">
+      <div class="col-md-4">
         <div class="input-group">
           <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
-          <input type="text" name="search" class="form-control border-start-0 bg-light" placeholder="Search by name, employee ID, or email..." value="{{ request.args.get('search', '') }}">
+          <input type="text" name="search" class="form-control border-start-0 bg-light" placeholder="Search name, ID, email..." value="{{ request.args.get('search', '') }}">
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <select name="department_id" class="form-select bg-light">
           <option value="">All Departments</option>
           {% for d in departments %}
@@ -31,7 +31,14 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3 d-flex gap-2">
+      <div class="col-md-3">
+        <select name="role_filter" class="form-select bg-light">
+          <option value="">All Roles</option>
+          <option value="hod" {% if request.args.get('role_filter') == 'hod' %}selected{% endif %}>Head of Department (HOD)</option>
+          <option value="faculty" {% if request.args.get('role_filter') == 'faculty' %}selected{% endif %}>Professors only</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
         <button type="submit" class="btn btn-secondary w-100">Filter</button>
         <a href="{{ url_for('admin.faculty') }}" class="btn btn-outline-secondary">Reset</a>
       </div>
@@ -72,7 +79,12 @@
             </td>
             <td><code>{{ f.employee_id }}</code></td>
             <td>{{ f.department.department_name if f.department else 'N/A' }}</td>
-            <td><span class="badge bg-light text-dark border">{{ f.designation or 'Faculty' }}</span></td>
+            <td>
+              {% if f.is_hod %}
+                <span class="badge bg-warning text-dark me-1"><i class="bi bi-star-fill me-1"></i>HOD</span>
+              {% endif %}
+              <span class="badge bg-light text-dark border">{{ f.designation or 'Professor' }}</span>
+            </td>
             <td>
               {% if f.user.is_active %}
               <span class="badge bg-success-subtle text-success">Active</span>
