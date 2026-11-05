@@ -657,16 +657,33 @@ def exam_questions(id):
 def add_question(id):
     faculty = _get_current_faculty()
     exam = Exam.query.get_or_404(id)
-    if exam.created_by_faculty_id != faculty.id:
+    if exam.created_by_faculty_id and exam.created_by_faculty_id != faculty.id:
         abort(403)
 
-    data = request.get_json(silent=True) or {}
-    question_text = (data.get('question_text') or '').strip()
-    marks = float(data.get('marks', 1))
-    options = data.get('options', [])
+    is_json = request.is_json
+    if is_json:
+        data = request.get_json(silent=True) or {}
+        question_text = (data.get('question_text') or '').strip()
+        marks = float(data.get('marks', 1))
+        options_data = data.get('options', [])
+    else:
+        question_text = request.form.get('question_text', '').strip()
+        marks = float(request.form.get('marks', 1) or 1)
+        correct_num = request.form.get('correct_option', '1')
+        options_data = []
+        for i in range(1, 5):
+            opt_val = request.form.get(f'option_{i}', '').strip()
+            if opt_val:
+                options_data.append({
+                    'text': opt_val,
+                    'is_correct': (str(i) == str(correct_num)),
+                })
 
     if not question_text:
-        return jsonify({'error': 'question_text is required.'}), 400
+        if is_json:
+            return jsonify({'error': 'question_text is required.'}), 400
+        flash('Question text is required.', 'danger')
+        return redirect(url_for('faculty.exam_questions', id=id))
 
     order = ExamQuestion.query.filter_by(exam_id=id).count() + 1
     question = ExamQuestion(
@@ -678,16 +695,20 @@ def add_question(id):
     db.session.add(question)
     db.session.flush()
 
-    for opt in options:
+    for opt in options_data:
         option = ExamOption(
             question_id=question.id,
-            text=opt.get('text', '').strip(),
+            option_text=opt.get('text', '').strip(),
             is_correct=bool(opt.get('is_correct', False)),
         )
         db.session.add(option)
 
     db.session.commit()
-    return jsonify({'message': 'Question added.', 'question_id': question.id}), 201
+
+    if is_json:
+        return jsonify({'success': True, 'message': 'Question added.', 'question_id': question.id}), 201
+    flash('Question added successfully.', 'success')
+    return redirect(url_for('faculty.exam_questions', id=id))
 
 
 @faculty_bp.route('/questions/<int:id>/edit', methods=['POST'])
@@ -717,7 +738,7 @@ def delete_question(id):
         abort(403)
     db.session.delete(question)
     db.session.commit()
-    return jsonify({'message': 'Question deleted.'}), 200
+    return jsonify({'success': True, 'message': 'Question deleted.'}), 200
 
 
 @faculty_bp.route('/examinations/<int:id>/attempts')

@@ -2,11 +2,11 @@
 
 {% block title %}Manage Questions - {{ exam.title }}{% endblock %}
 
-{% block content %}
+{% block faculty_content %}
 <div class="page-header d-flex justify-content-between align-items-center mb-4">
   <div>
     <h2 class="page-title"><i class="bi bi-question-circle me-2 text-success"></i>Manage Questions</h2>
-    <p class="text-muted mb-0">Exam: <strong>{{ exam.title }}</strong> | Subject: {{ exam.subject.subject_name }}</p>
+    <p class="text-muted mb-0">Exam: <strong>{{ exam.title }}</strong> | Subject: {{ exam.subject.subject_name if exam.subject else 'General' }}</p>
   </div>
   <div class="d-flex gap-2">
     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addQuestionModal">
@@ -19,10 +19,10 @@
 <!-- Questions List -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white border-bottom py-3">
-    <h5 class="card-title fw-bold mb-0">Questions in this Exam ({{ exam.questions|length }})</h5>
+    <h5 class="card-title fw-bold mb-0">Questions in this Exam ({{ questions|length }})</h5>
   </div>
   <div class="card-body p-4">
-    {% for q in exam.questions %}
+    {% for q in questions %}
     <div class="border rounded p-3 mb-3 bg-light bg-opacity-50 position-relative">
       <div class="d-flex justify-content-between align-items-start mb-2">
         <h6 class="fw-bold mb-0">Q{{ loop.index }}. {{ q.question_text }}</h6>
@@ -123,12 +123,23 @@ function deleteQuestion(id) {
     fetch(`/faculty/questions/${id}/delete`, {
       method: 'POST',
       headers: {
-        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '',
+        'Accept': 'application/json'
       }
     })
     .then(r => r.json())
-    .then(d => { if(d.success) location.reload(); else alert(d.message); });
+    .then(d => {
+      if (d.success || d.message) {
+        location.reload();
+      } else {
+        alert(d.error || 'Failed to delete question');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      location.reload();
+    });
   }
 }
 </script>
-{% endblock %}
+{% endblock faculty_content %}
