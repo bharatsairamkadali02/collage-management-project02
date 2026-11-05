@@ -46,24 +46,69 @@ def dashboard():
     faculty = _get_current_faculty()
 
     assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
-    class_ids = list({a.class_section_id for a in assignments})
-    subject_ids = list({a.subject_id for a in assignments})
+    class_ids = list({a.class_section_id for a in assignments if a.class_section_id})
+    subject_ids = list({a.subject_id for a in assignments if a.subject_id})
 
-    assigned_students = (
-        Student.query
-        .filter(Student.class_section_id.in_(class_ids), Student.academic_status == 'active')
-        .count()
-    ) if class_ids else 0
+    # Student count: if assigned to specific sections, count those; otherwise fallback to department active students
+    if class_ids:
+        assigned_students = (
+            Student.query
+            .filter(Student.current_class_section_id.in_(class_ids), Student.academic_status == 'active')
+            .count()
+        )
+        assigned_subjects_count = len(subject_ids)
+    elif faculty.department_id:
+        assigned_students = (
+            Student.query
+            .filter(Student.department_id == faculty.department_id, Student.academic_status == 'active')
+            .count()
+        )
+        assigned_subjects_count = Subject.query.filter_by(department_id=faculty.department_id, is_active=True).count()
+    else:
+        assigned_students = Student.query.filter_by(academic_status='active').count()
+        assigned_subjects_count = Subject.query.filter_by(is_active=True).count()
 
     today = datetime.date.today()
+
+    # Query real attendance sessions recorded today by this faculty member
     today_sessions = (
         AttendanceSession.query
         .filter(
             AttendanceSession.faculty_id == faculty.id,
             AttendanceSession.session_date == today,
         )
-        .count()
+        .order_by(AttendanceSession.id.desc())
+        .all()
     )
+
+    # Build today_attendance_list from real sessions and assigned classes
+    today_attendance_list = []
+    recorded_pairs = set()
+
+    for s in today_sessions:
+        recorded_pairs.add((s.class_section_id, s.subject_id))
+        rec_count = s.records.count() if hasattr(s, 'records') and s.records else 0
+        today_attendance_list.append({
+            'session_id': s.id,
+            'subject': s.subject.subject_name if s.subject else 'Subject',
+            'subject_code': s.subject.subject_code if s.subject else '',
+            'section': f"Sem {s.class_section.semester.semester_number if s.class_section and s.class_section.semester else ''} - Sec {s.class_section.section_name if s.class_section else ''}",
+            'time': s.start_time.strftime('%I:%M %p') if s.start_time else 'Today',
+            'marked': True,
+            'records_count': rec_count,
+        })
+
+    for a in assignments:
+        if (a.class_section_id, a.subject_id) not in recorded_pairs:
+            today_attendance_list.append({
+                'session_id': None,
+                'subject': a.subject.subject_name if a.subject else 'Subject',
+                'subject_code': a.subject.subject_code if a.subject else '',
+                'section': f"Sem {a.class_section.semester.semester_number if a.class_section and a.class_section.semester else ''} - Sec {a.class_section.section_name if a.class_section else ''}",
+                'time': 'Scheduled Today',
+                'marked': False,
+                'records_count': 0,
+            })
 
     upcoming_exams = (
         Exam.query
@@ -106,16 +151,17 @@ def dashboard():
         'faculty/dashboard.html',
         stats={
             "total_students": assigned_students,
-            "assigned_subjects": len(subject_ids),
-            "today_classes": today_sessions,
+            "assigned_subjects": assigned_subjects_count,
+            "today_classes": len(today_sessions),
             "pending_assignments": Assignment.query.filter_by(
                 faculty_id=faculty.id, status="draft"
-            ).count(),
+            ).count() if faculty.id else 0,
         },
         faculty=faculty,
         assigned_students=assigned_students,
-        assigned_subjects=len(subject_ids),
-        today_attendance_sessions=today_sessions,
+        assigned_subjects=assigned_subjects_count,
+        today_attendance_sessions=len(today_sessions),
+        today_classes=today_attendance_list,
         upcoming_exams=upcoming_exams,
         dept_professors=dept_professors,
         greeting=greeting,
@@ -133,13 +179,19 @@ def dashboard():
 def students():
     faculty = _get_current_faculty()
     assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
-    class_ids = list({a.class_section_id for a in assignments})
+    class_ids = list({a.class_section_id for a in assignments if a.class_section_id})
 
     search = request.args.get('search', '').strip()
+    section_id = request.args.get('section', type=int)
+
     query = Student.query.join(User).filter(Student.academic_status == 'active')
 
-    if class_ids:
+    if section_id:
+        query = query.filter(Student.current_class_section_id == section_id)
+    elif class_ids:
         query = query.filter(Student.current_class_section_id.in_(class_ids))
+    elif faculty.department_id:
+        query = query.filter(Student.department_id == faculty.department_id)
 
     if search:
         like = f'%{search}%'
@@ -152,16 +204,37 @@ def students():
             )
         )
 
-    students_list = query.order_by(User.last_name).all()
-    assigned_sections = (
-        ClassSection.query.filter(ClassSection.id.in_(class_ids)).order_by(ClassSection.section_name).all()
-        if class_ids else ClassSection.query.order_by(ClassSection.section_name).all()
-    )
+    students_list = query.order_by(User.last_name, User.first_name).all()
+
+    # Get class sections for dropdown
+    if class_ids:
+        assigned_sections = (
+            ClassSection.query
+            .filter(ClassSection.id.in_(class_ids))
+            .order_by(ClassSection.semester_id, ClassSection.section_name)
+            .all()
+        )
+    elif faculty.department_id:
+        assigned_sections = (
+            ClassSection.query
+            .filter_by(department_id=faculty.department_id)
+            .order_by(ClassSection.semester_id, ClassSection.section_name)
+            .all()
+        )
+    else:
+        assigned_sections = (
+            ClassSection.query
+            .order_by(ClassSection.semester_id, ClassSection.section_name)
+            .all()
+        )
+
     return render_template(
         'faculty/students.html',
         students=students_list,
         faculty=faculty,
         assigned_sections=assigned_sections,
+        selected_section=section_id,
+        search=search,
     )
 
 

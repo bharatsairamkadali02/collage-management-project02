@@ -7,15 +7,13 @@
 <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#0d6e6e,#1aab8a);">
   <div class="card-body d-flex align-items-center justify-content-between py-4 px-4">
     <div>
-      <h4 class="text-white mb-2 fw-bold d-flex flex-wrap align-items-center gap-2">
+      <h4 class="text-white mb-2 fw-bold d-flex flex-wrap align-items-center gap-1">
         <span id="timeGreeting">{{ greeting | default('Good morning') }}</span>,
         {% if faculty and faculty.is_hod %}
-          <span class="badge bg-warning text-dark align-middle"><i class="bi bi-star-fill me-1"></i>HOD</span>
+          <span class="badge bg-warning text-dark align-middle ms-1"><i class="bi bi-star-fill me-1"></i>HOD</span>
           <span>{{ current_user.get_full_name() }}</span>
-        {% elif faculty and faculty.designation and ('Dr' in faculty.designation or 'Prof' in faculty.designation) %}
-          <span>{{ faculty.designation }} {{ current_user.get_full_name() }}</span>
-        {% elif faculty and faculty.designation %}
-          <span>{{ faculty.designation }} {{ current_user.get_full_name() }}</span>
+        {% elif faculty and faculty.designation and faculty.designation.strip() %}
+          <span>{{ faculty.designation.strip().title() }} {{ current_user.get_full_name() }}</span>
         {% else %}
           <span>Prof. {{ current_user.get_full_name() }}</span>
         {% endif %}!
@@ -28,11 +26,11 @@
         {% if faculty and faculty.is_hod %}
           <span class="badge bg-warning text-dark"><i class="bi bi-award-fill me-1"></i>Head of Department</span>
           <span>&bull;</span>
-        {% elif faculty and faculty.designation %}
-          <span class="badge bg-white bg-opacity-25 text-white">{{ faculty.designation }}</span>
+        {% elif faculty and faculty.designation and faculty.designation.strip() %}
+          <span class="badge" style="background:rgba(255,255,255,0.22);color:#ffffff;">{{ faculty.designation.strip().title() }}</span>
           <span>&bull;</span>
         {% else %}
-          <span class="badge bg-white bg-opacity-25 text-white">Professor</span>
+          <span class="badge" style="background:rgba(255,255,255,0.22);color:#ffffff;">Professor</span>
           <span>&bull;</span>
         {% endif %}
         <span><i class="bi bi-calendar3 me-1"></i><span id="greetingDate">{{ now_ist.strftime('%A, %d %B %Y') if now_ist else (now.strftime('%A, %d %B %Y') if now else 'Today') }}</span></span>
@@ -121,28 +119,45 @@
               </tr>
             </thead>
             <tbody>
-              {% for cls in today_classes | default([
-                {'subject':'Data Structures','section':'CS-3A','time':'9:00 AM','marked':true},
-                {'subject':'Algorithms','section':'CS-3B','time':'11:00 AM','marked':false},
-                {'subject':'DBMS','section':'CS-4A','time':'2:00 PM','marked':false}
-              ]) %}
+              {% for cls in today_classes %}
               <tr>
-                <td class="ps-3 fw-semibold">{{ cls.subject }}</td>
+                <td class="ps-3 fw-semibold">
+                  {{ cls.subject }}
+                  {% if cls.subject_code %}
+                    <small class="text-muted d-block font-monospace">{{ cls.subject_code }}</small>
+                  {% endif %}
+                </td>
                 <td><span class="badge bg-light text-dark border">{{ cls.section }}</span></td>
                 <td class="text-muted small">{{ cls.time }}</td>
                 <td>
                   {% if cls.marked %}
-                    <span class="badge bg-success">Marked</span>
+                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Recorded</span>
                   {% else %}
-                    <span class="badge bg-warning text-dark">Pending</span>
+                    <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Pending</span>
                   {% endif %}
                 </td>
                 <td>
-                  {% if not cls.marked %}
-                    <a href="/faculty/attendance" class="btn btn-sm btn-outline-success">Mark Attendance</a>
+                  {% if cls.marked %}
+                    <a href="/faculty/attendance" class="btn btn-sm btn-outline-secondary">
+                      <i class="bi bi-eye me-1"></i>View Session
+                    </a>
                   {% else %}
-                    <a href="/faculty/attendance" class="btn btn-sm btn-outline-secondary">View</a>
+                    <a href="/faculty/attendance" class="btn btn-sm text-white" style="background:#0d6e6e;">
+                      <i class="bi bi-check2-square me-1"></i>Take Attendance
+                    </a>
                   {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                  <i class="bi bi-calendar-check fs-2 d-block mb-2 text-secondary"></i>
+                  No attendance sessions marked yet today.
+                  <div class="mt-2">
+                    <a href="/faculty/attendance" class="btn btn-sm text-white" style="background:#0d6e6e;">
+                      <i class="bi bi-plus-circle me-1"></i>Record Attendance
+                    </a>
+                  </div>
                 </td>
               </tr>
               {% endfor %}

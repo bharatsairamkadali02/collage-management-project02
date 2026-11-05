@@ -18,8 +18,10 @@
         <label class="form-label fw-semibold small">Class Section</label>
         <select name="section" class="form-select">
           <option value="">All Sections</option>
-          {% for section in assigned_sections | default(['CS-3A','CS-3B','CS-4A','CS-4B']) %}
-          <option value="{{ section }}" {% if request.args.get('section') == section %}selected{% endif %}>{{ section }}</option>
+          {% for sec in assigned_sections %}
+          <option value="{{ sec.id }}" {% if selected_section and selected_section|int == sec.id %}selected{% elif request.args.get('section') and request.args.get('section')|int == sec.id %}selected{% endif %}>
+            Semester {{ sec.semester.semester_number if sec.semester else sec.semester_id }} &mdash; Section {{ sec.section_name or sec.name }}{% if sec.department %} ({{ sec.department.department_code or sec.department.department_name }}){% endif %}
+          </option>
           {% endfor %}
         </select>
       </div>
@@ -72,7 +74,15 @@
             </td>
             <td class="fw-semibold">{{ student.user.get_full_name() if student.user else (student.name or 'Student') }}</td>
             <td><code>{{ student.student_roll_number or student.enrollment_number or (student.roll or 'N/A') }}</code></td>
-            <td><span class="badge bg-light text-dark border">{{ student.current_class_section.section_name if student.current_class_section else (student.section or 'N/A') }}</span></td>
+            <td>
+              {% if student.current_class_section %}
+                <span class="badge bg-light text-dark border">
+                  Sem {{ student.current_class_section.semester.semester_number if student.current_class_section.semester else '' }} - Sec {{ student.current_class_section.section_name }}
+                </span>
+              {% else %}
+                <span class="text-muted small">&mdash;</span>
+              {% endif %}
+            </td>
             <td>
               {% set att_pct = student.get_attendance_percentage() if student.get_attendance_percentage else (student.attendance or 0) %}
               <div class="d-flex align-items-center gap-2">
