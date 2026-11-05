@@ -1167,3 +1167,96 @@ def api_my_subjects():
         {'id': s.id, 'name': s.name, 'code': s.code, 'credits': s.credits}
         for s in subjects
     ]), 200
+
+
+# ---------------------------------------------------------------------------
+# Profile & Settings
+# ---------------------------------------------------------------------------
+@faculty_bp.route('/profile', methods=['GET', 'POST'])
+@login_required
+@faculty_required
+def profile():
+    faculty = _get_current_faculty()
+    s3 = S3Service()
+
+    if request.method == 'POST':
+        phone = request.form.get('phone', '').strip()
+        specialization = request.form.get('specialization', '').strip()
+        qualification = request.form.get('qualification', '').strip()
+
+        if phone:
+            current_user.phone = phone
+        if specialization:
+            faculty.specialization = specialization
+        if qualification:
+            faculty.qualification = qualification
+
+        db.session.commit()
+        flash('Profile details updated successfully.', 'success')
+        return redirect(url_for('faculty.profile'))
+
+    photo_url = s3.generate_presigned_url(faculty.profile_photo_key) if faculty.profile_photo_key else None
+    assignments = FacultyAssignment.query.filter_by(faculty_id=faculty.id).all()
+
+    return render_template(
+        'faculty/profile.html',
+        faculty=faculty,
+        photo_url=photo_url,
+        assignments=assignments,
+    )
+
+
+@faculty_bp.route('/profile/upload-photo', methods=['POST'])
+@login_required
+@faculty_required
+def upload_photo():
+    faculty = _get_current_faculty()
+    if 'photo' not in request.files:
+        return jsonify({'success': False, 'message': 'No file uploaded.'}), 400
+
+    file = request.files['photo']
+    if not file or file.filename == '':
+        return jsonify({'success': False, 'message': 'No file selected.'}), 400
+
+    try:
+        s3 = S3Service()
+        key = s3.upload_faculty_photo(file, faculty.id)
+        if not key:
+            return jsonify({'success': False, 'message': 'Invalid file format or upload failed.'}), 400
+        faculty.profile_photo_key = key
+        current_user.profile_photo_key = key
+        db.session.commit()
+        url = s3.generate_presigned_url(key)
+        return jsonify({'success': True, 'message': 'Profile photo updated successfully!', 'url': url}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@faculty_bp.route('/settings', methods=['GET', 'POST'])
+@login_required
+@faculty_required
+def settings():
+    faculty = _get_current_faculty()
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not current_user.check_password(current_password):
+            flash('Current password is incorrect.', 'danger')
+            return redirect(url_for('faculty.settings'))
+
+        if len(new_password) < 6:
+            flash('New password must be at least 6 characters long.', 'danger')
+            return redirect(url_for('faculty.settings'))
+
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'danger')
+            return redirect(url_for('faculty.settings'))
+
+        current_user.set_password(new_password)
+        db.session.commit()
+        flash('Password changed successfully.', 'success')
+        return redirect(url_for('faculty.settings'))
+
+    return render_template('faculty/settings.html', faculty=faculty)
