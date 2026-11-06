@@ -3,12 +3,16 @@
 {% block sidebar %}
 
 <style>
+  #sidebar, .sidebar {
+    overflow-anchor: none !important;
+  }
   .sidebar .nav-link {
-    color: rgba(255, 255, 255, 0.85) !important;
+    color: rgba(255, 255, 255, 0.88) !important;
     border-radius: 8px !important;
-    padding: 10px 14px !important;
+    padding: 7px 12px !important;
+    font-size: 0.88rem !important;
     background: transparent !important;
-    transition: all 0.2s ease !important;
+    transition: background 0.15s ease, color 0.15s ease !important;
   }
   .sidebar .nav-link:hover {
     background: rgba(255, 255, 255, 0.15) !important;
@@ -22,18 +26,19 @@
   }
   .sidebar .nav-link i {
     color: rgba(255, 255, 255, 0.9) !important;
+    font-size: 1.05rem !important;
   }
 </style>
 
-<div class="sidebar d-flex flex-column flex-shrink-0 p-3" style="width:260px;min-height:100vh;background:linear-gradient(180deg,#0d6e6e 0%,#064f4f 100%);">
-  <a href="/faculty/dashboard" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+<div class="sidebar d-flex flex-column flex-shrink-0 p-2" style="width:260px;min-height:100%;overflow-anchor:none;background:linear-gradient(180deg,#0d6e6e 0%,#064f4f 100%);">
+  <a href="/faculty/dashboard" class="d-flex align-items-center mb-2 mb-md-0 me-md-auto text-white text-decoration-none">
     <i class="bi bi-mortarboard-fill fs-4 me-2"></i>
     <span class="fs-5 fw-bold">Faculty Portal</span>
   </a>
   <hr class="text-white-50">
 
   {% if current_user %}
-  <a href="/faculty/profile" class="d-flex align-items-center mb-3 px-2 text-decoration-none rounded-3 py-1" style="background:rgba(255,255,255,0.08);" title="View My Profile">
+  <a href="/faculty/profile" class="d-flex align-items-center mb-2 px-2 text-decoration-none rounded-3 py-1" style="background:rgba(255,255,255,0.08);" title="View My Profile">
     <div class="rounded-circle bg-white d-flex align-items-center justify-content-center me-2" style="width:42px;height:42px;min-width:42px;">
       <i class="bi bi-person-fill text-success fs-5"></i>
     </div>
@@ -54,7 +59,7 @@
   </a>
   {% endif %}
 
-  <ul class="nav nav-pills flex-column mb-auto gap-1">
+  <ul class="nav nav-pills flex-column mb-2" style="gap:2px;">
     <li class="nav-item">
       <a href="/faculty/profile" class="nav-link text-white {% if request.path == '/faculty/profile' %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-person-badge fs-5"></i> My Profile

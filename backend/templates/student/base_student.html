@@ -3,12 +3,16 @@
 {% block sidebar %}
 
 <style>
+  #sidebar, .sidebar {
+    overflow-anchor: none !important;
+  }
   .sidebar .nav-link {
-    color: rgba(255, 255, 255, 0.85) !important;
+    color: rgba(255, 255, 255, 0.88) !important;
     border-radius: 8px !important;
-    padding: 10px 14px !important;
+    padding: 7px 12px !important;
+    font-size: 0.88rem !important;
     background: transparent !important;
-    transition: all 0.2s ease !important;
+    transition: background 0.15s ease, color 0.15s ease !important;
   }
   .sidebar .nav-link:hover {
     background: rgba(255, 255, 255, 0.15) !important;
@@ -22,10 +26,11 @@
   }
   .sidebar .nav-link i {
     color: rgba(255, 255, 255, 0.9) !important;
+    font-size: 1.05rem !important;
   }
 </style>
 
-<div class="sidebar d-flex flex-column flex-shrink-0 p-3" style="width:260px;min-height:100vh;background:linear-gradient(180deg,#6a1b9a 0%,#4a0072 100%);">
+<div class="sidebar d-flex flex-column flex-shrink-0 p-2" style="width:260px;min-height:100%;overflow-anchor:none;background:linear-gradient(180deg,#6a1b9a 0%,#4a0072 100%);">
   <a href="/student/dashboard" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
     <i class="bi bi-book-fill fs-4 me-2"></i>
     <span class="fs-5 fw-bold">Student Portal</span>
@@ -50,7 +55,7 @@
   </div>
   {% endif %}
 
-  <ul class="nav nav-pills flex-column mb-auto gap-1">
+  <ul class="nav nav-pills flex-column mb-2" style="gap:2px;">
     <li class="nav-item">
       <a href="/student/dashboard" class="nav-link text-white {% if request.path == '/student/dashboard' %}active{% endif %} d-flex align-items-center gap-2">
         <i class="bi bi-speedometer2 fs-5"></i> Dashboard

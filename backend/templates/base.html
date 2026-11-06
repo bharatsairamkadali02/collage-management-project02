@@ -37,6 +37,8 @@
       z-index: 1040;
       transition: transform .3s ease;
       overflow-y: auto;
+      overflow-anchor: none;
+      scroll-behavior: auto;
     }
     #sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-w))); }
 
@@ -368,6 +370,19 @@
         link.classList.add('active');
       }
     });
+
+    /* Preserve sidebar scroll position across navigation */
+    const sb = document.getElementById('sidebar');
+    if (sb) {
+      const scrollKey = 'sidebar_scroll_' + (path.split('/')[1] || 'default');
+      const savedPos = sessionStorage.getItem(scrollKey);
+      if (savedPos !== null) {
+        sb.scrollTop = parseInt(savedPos, 10);
+      }
+      sb.addEventListener('scroll', () => {
+        sessionStorage.setItem(scrollKey, sb.scrollTop);
+      }, { passive: true });
+    }
   });
 </script>
 
