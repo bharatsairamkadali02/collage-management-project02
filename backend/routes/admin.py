@@ -760,8 +760,51 @@ def results():
 @admin_required
 def fees():
     page = request.args.get('page', 1, type=int)
-    fee_records = FeeRecord.query.order_by(FeeRecord.due_date.asc()).paginate(page=page, per_page=25)
-    return render_template('admin/fees.html', fee_records=fee_records)
+    search = request.args.get('search', '').strip()
+    status = request.args.get('status', '').strip()
+
+    query = FeeRecord.query
+
+    if status:
+        query = query.filter(FeeRecord.payment_status == status)
+
+    if search:
+        like = f'%{search}%'
+        query = query.join(Student).join(User).filter(
+            db.or_(
+                User.first_name.ilike(like),
+                User.last_name.ilike(like),
+                Student.student_roll_number.ilike(like),
+            )
+        )
+
+    pagination = query.order_by(FeeRecord.due_date.asc(), FeeRecord.id.desc()).paginate(
+        page=page, per_page=25, error_out=False
+    )
+
+    total_fees_due = db.session.query(func.coalesce(func.sum(FeeRecord.total_amount), 0)).scalar() or 0
+    total_fees_paid = db.session.query(func.coalesce(func.sum(FeeRecord.amount_paid), 0)).scalar() or 0
+    fee_summary = {
+        'due': float(total_fees_due),
+        'paid': float(total_fees_paid),
+        'pending': max(0.0, float(total_fees_due) - float(total_fees_paid)),
+    }
+
+    students = Student.query.join(User).order_by(User.first_name.asc(), User.last_name.asc()).all()
+    semesters = Semester.query.order_by(Semester.semester_number.asc()).all()
+    academic_years = AcademicYear.query.order_by(AcademicYear.id.desc()).all()
+
+    return render_template(
+        'admin/fees.html',
+        fee_records=pagination.items,
+        pagination=pagination,
+        fee_summary=fee_summary,
+        students=students,
+        semesters=semesters,
+        academic_years=academic_years,
+        search=search,
+        status=status,
+    )
 
 
 @admin_bp.route('/fees/add-record', methods=['POST'])
