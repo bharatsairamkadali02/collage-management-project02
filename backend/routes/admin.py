@@ -23,6 +23,112 @@ import uuid
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
+ADD_STUDENT_TEMPLATE = 'admin/add_student.html'
+ADD_FACULTY_TEMPLATE = 'admin/add_faculty.html'
+ADMIN_DEPARTMENTS_ROUTE = 'admin.departments'
+ADMIN_SUBJECTS_ROUTE = 'admin.subjects'
+
+
+def _validate_student_form(first_name, last_name, email, password, enrollment_number, department_id, class_section_id):
+    if not all([first_name, last_name, email, password, enrollment_number, department_id]):
+        return 'All required fields must be filled.'
+    if User.query.filter_by(email=email).first():
+        return 'A user with this email already exists.'
+    if Student.query.filter_by(enrollment_number=enrollment_number).first():
+        return 'Enrollment number already exists.'
+    if class_section_id:
+        section = ClassSection.query.get(class_section_id)
+        if section and section.department_id != department_id:
+            return 'The selected class section belongs to a different department.'
+    return None
+
+
+def _validate_faculty_form(first_name, last_name, email, password, employee_id, department_id):
+    if not all([first_name, last_name, email, password, employee_id, department_id]):
+        return 'All required fields must be filled.'
+    if User.query.filter_by(email=email).first():
+        return 'A user with this email already exists.'
+    if Faculty.query.filter_by(employee_id=employee_id).first():
+        return 'Employee ID already exists.'
+    return None
+
+
+def _sync_faculty_hod_status(faculty_member, is_hod_val):
+    if not faculty_member.department_id:
+        return
+    dept = Department.query.get(faculty_member.department_id)
+    if not dept:
+        return
+    if is_hod_val:
+        prev_hods = Faculty.query.filter_by(department_id=dept.id, is_hod=True).all()
+        for h in prev_hods:
+            if h.id != faculty_member.id:
+                h.is_hod = False
+        dept.hod_faculty_id = faculty_member.id
+    elif dept.hod_faculty_id == faculty_member.id:
+        dept.hod_faculty_id = None
+
+
+def _parse_subject_inputs(data, is_json):
+    name = (data.get('subject_name') or data.get('name') or '').strip()
+    code = (data.get('subject_code') or data.get('code') or '').strip().upper()
+    try:
+        if is_json:
+            dept_id = int(data.get('department_id') or 0)
+            sem_id = int(data.get('semester_id') or 0)
+        else:
+            dept_id = data.get('department_id', 0, type=int)
+            sem_id = data.get('semester_id', 0, type=int)
+        sub_credits = int(data.get('credits') or 3)
+        max_int = float(data.get('max_internal_marks') or 40)
+        max_ext = float(data.get('max_external_marks') or 60)
+    except (TypeError, ValueError):
+        dept_id, sem_id = 0, 0
+        sub_credits, max_int, max_ext = 0, 0, 0
+    return name, code, dept_id, sem_id, sub_credits, max_int, max_ext
+
+
+def _validate_subject_inputs(name, code, dept_id, sem_id, sub_credits):
+    if not name or not code or not dept_id or not sem_id or sub_credits < 1:
+        return 'Subject name, code, department, semester, and valid credits are required.', 400
+    if Subject.query.filter_by(code=code).first():
+        return 'Subject code already exists.', 409
+    dept = Department.query.get(dept_id)
+    sem = Semester.query.get(sem_id)
+    if not dept or not sem or sem.department_id != dept_id:
+        return 'Choose a semester that belongs to the selected department.', 400
+    return None, 200
+
+
+def _parse_class_section_inputs(data, is_json):
+    name = (data.get('name') or '').strip()
+    try:
+        if is_json:
+            dept_id = int(data.get('department_id') or 0)
+            sem_id = int(data.get('semester_id') or 0)
+            ay_id = int(data.get('academic_year_id') or 0)
+            max_std = int(data.get('max_students') or 60)
+        else:
+            dept_id = data.get('department_id', 0, type=int)
+            sem_id = data.get('semester_id', 0, type=int)
+            ay_id = data.get('academic_year_id', 0, type=int)
+            max_std = data.get('max_students', 60, type=int)
+    except (TypeError, ValueError):
+        dept_id, sem_id, ay_id = 0, 0, 0
+        max_std = 0
+    return name, dept_id, sem_id, ay_id, max_std
+
+
+def _validate_class_section_inputs(name, dept_id, sem_id, ay_id, max_std):
+    if not all([name, dept_id, sem_id, ay_id]) or max_std < 1:
+        return 'Section name, department, semester, academic year, and valid capacity are required.'
+    sem = Semester.query.get(sem_id)
+    if not Department.query.get(dept_id) or not AcademicYear.query.get(ay_id):
+        return 'Select a valid department and academic year.'
+    if not sem or sem.department_id != dept_id or sem.academic_year_id != ay_id:
+        return 'Choose a semester that belongs to the selected department and academic year.'
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Dashboard
@@ -141,17 +247,10 @@ def add_student():
         class_section_id = request.form.get('class_section_id', type=int)
         date_of_birth = request.form.get('date_of_birth')
 
-        if not all([first_name, last_name, email, password, enrollment_number, department_id]):
-            flash('All required fields must be filled.', 'danger')
-            return render_template('admin/add_student.html', departments=departments, class_sections=class_sections)
-
-        if User.query.filter_by(email=email).first():
-            flash('A user with this email already exists.', 'danger')
-            return render_template('admin/add_student.html', departments=departments, class_sections=class_sections)
-
-        if Student.query.filter_by(enrollment_number=enrollment_number).first():
-            flash('Enrollment number already exists.', 'danger')
-            return render_template('admin/add_student.html', departments=departments, class_sections=class_sections)
+        err = _validate_student_form(first_name, last_name, email, password, enrollment_number, department_id, class_section_id)
+        if err:
+            flash(err, 'danger')
+            return render_template(ADD_STUDENT_TEMPLATE, departments=departments, class_sections=class_sections)
 
         student_role = Role.query.filter_by(role_name='Student').first()
         user = User(
@@ -169,10 +268,6 @@ def add_student():
 
         dob = datetime.date.fromisoformat(date_of_birth) if date_of_birth else None
         section = ClassSection.query.get(class_section_id) if class_section_id else None
-        if section and section.department_id != department_id:
-            flash('The selected class section belongs to a different department.', 'danger')
-            return render_template('admin/add_student.html', departments=departments, class_sections=class_sections)
-
         student = Student(
             user_id=user.id,
             enrollment_number=enrollment_number,
@@ -197,7 +292,7 @@ def add_student():
         flash(f'Student {first_name} {last_name} added successfully.', 'success')
         return redirect(url_for('admin.students'))
 
-    return render_template('admin/add_student.html', departments=departments, class_sections=class_sections)
+    return render_template(ADD_STUDENT_TEMPLATE, departments=departments, class_sections=class_sections)
 
 
 @admin_bp.route('/students/<int:id>/edit', methods=['GET', 'POST'])
@@ -313,17 +408,10 @@ def add_faculty():
         designation = request.form.get('designation', '').strip()
         qualification = request.form.get('qualification', '').strip()
 
-        if not all([first_name, last_name, email, password, employee_id, department_id]):
-            flash('All required fields must be filled.', 'danger')
-            return render_template('admin/add_faculty.html', departments=departments)
-
-        if User.query.filter_by(email=email).first():
-            flash('A user with this email already exists.', 'danger')
-            return render_template('admin/add_faculty.html', departments=departments)
-
-        if Faculty.query.filter_by(employee_id=employee_id).first():
-            flash('Employee ID already exists.', 'danger')
-            return render_template('admin/add_faculty.html', departments=departments)
+        err = _validate_faculty_form(first_name, last_name, email, password, employee_id, department_id)
+        if err:
+            flash(err, 'danger')
+            return render_template(ADD_FACULTY_TEMPLATE, departments=departments)
 
         faculty_role = Role.query.filter_by(role_name='Faculty').first()
         user = User(
@@ -352,7 +440,7 @@ def add_faculty():
         flash(f'Faculty member {first_name} {last_name} added successfully.', 'success')
         return redirect(url_for('admin.faculty'))
 
-    return render_template('admin/add_faculty.html', departments=departments)
+    return render_template(ADD_FACULTY_TEMPLATE, departments=departments)
 
 
 @admin_bp.route('/faculty/<int:id>/edit', methods=['GET', 'POST'])
@@ -371,17 +459,7 @@ def edit_faculty(id):
         faculty_member.qualification = request.form.get('qualification', faculty_member.qualification).strip()
         is_hod_val = bool(request.form.get('is_hod'))
         faculty_member.is_hod = is_hod_val
-        if faculty_member.department_id:
-            dept = Department.query.get(faculty_member.department_id)
-            if dept:
-                if is_hod_val:
-                    prev_hods = Faculty.query.filter_by(department_id=dept.id, is_hod=True).all()
-                    for h in prev_hods:
-                        if h.id != faculty_member.id:
-                            h.is_hod = False
-                    dept.hod_faculty_id = faculty_member.id
-                elif dept.hod_faculty_id == faculty_member.id:
-                    dept.hod_faculty_id = None
+        _sync_faculty_hod_status(faculty_member, is_hod_val)
         db.session.commit()
 
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -451,14 +529,14 @@ def add_department():
         if request.is_json:
             return jsonify({'error': message}), 400
         flash(message, 'danger')
-        return redirect(url_for('admin.departments'))
+        return redirect(url_for(ADMIN_DEPARTMENTS_ROUTE))
 
     if Department.query.filter_by(code=code).first() or Department.query.filter_by(name=name).first():
         message = 'A department with that name or code already exists.'
         if request.is_json:
             return jsonify({'error': message}), 409
         flash(message, 'danger')
-        return redirect(url_for('admin.departments'))
+        return redirect(url_for(ADMIN_DEPARTMENTS_ROUTE))
 
     dept = Department(name=name, code=code, description=description, hod_id=hod_id)
     db.session.add(dept)
@@ -466,7 +544,7 @@ def add_department():
     if request.is_json:
         return jsonify({'message': 'Department added.', 'department_id': dept.id}), 201
     flash(f'{name} department created.', 'success')
-    return redirect(url_for('admin.departments'))
+    return redirect(url_for(ADMIN_DEPARTMENTS_ROUTE))
 
 
 @admin_bp.route('/departments/<int:id>/edit', methods=['POST'])
@@ -516,53 +594,24 @@ def subjects():
 @admin_required
 def add_subject():
     data = request.get_json(silent=True) or request.form
-    name = (data.get('subject_name') or data.get('name') or '').strip()
-    code = (data.get('subject_code') or data.get('code') or '').strip().upper()
-    try:
-        if request.is_json:
-            department_id = int(data.get('department_id') or 0)
-            semester_id = int(data.get('semester_id') or 0)
-        else:
-            department_id = data.get('department_id', 0, type=int)
-            semester_id = data.get('semester_id', 0, type=int)
-        credits = int(data.get('credits') or 3)
-        max_internal_marks = float(data.get('max_internal_marks') or 40)
-        max_external_marks = float(data.get('max_external_marks') or 60)
-    except (TypeError, ValueError):
-        department_id, semester_id = 0, 0
-        credits, max_internal_marks, max_external_marks = 0, 0, 0
+    name, code, department_id, semester_id, subject_credits, max_internal_marks, max_external_marks = _parse_subject_inputs(data, request.is_json)
     subject_type = (data.get('subject_type') or 'theory').strip()
     description = (data.get('description') or '').strip()
 
-    if not name or not code or not department_id or not semester_id or credits < 1:
-        message = 'Subject name, code, department, semester, and valid credits are required.'
+    err_msg, status_code = _validate_subject_inputs(name, code, department_id, semester_id, subject_credits)
+    if err_msg:
         if request.is_json:
-            return jsonify({'error': message}), 400
-        flash(message, 'danger')
-        return redirect(url_for('admin.subjects'))
-
-    if Subject.query.filter_by(code=code).first():
-        message = 'Subject code already exists.'
-        if request.is_json:
-            return jsonify({'error': message}), 409
-        flash(message, 'danger')
-        return redirect(url_for('admin.subjects'))
+            return jsonify({'error': err_msg}), status_code
+        flash(err_msg, 'danger')
+        return redirect(url_for(ADMIN_SUBJECTS_ROUTE))
 
     department = Department.query.get(department_id)
-    semester = Semester.query.get(semester_id)
-    if not department or not semester or semester.department_id != department_id:
-        message = 'Choose a semester that belongs to the selected department.'
-        if request.is_json:
-            return jsonify({'error': message}), 400
-        flash(message, 'danger')
-        return redirect(url_for('admin.subjects'))
-
     subject = Subject(
         subject_name=name,
         subject_code=code,
         semester_id=semester_id,
         department_id=department_id,
-        credits=credits,
+        credits=subject_credits,
         max_internal_marks=max_internal_marks,
         max_external_marks=max_external_marks,
         subject_type=subject_type,
@@ -574,7 +623,7 @@ def add_subject():
     if request.is_json:
         return jsonify({'message': 'Subject added.', 'subject_id': subject.id}), 201
     flash(f'{name} added to {department.name}.', 'success')
-    return redirect(url_for('admin.subjects'))
+    return redirect(url_for(ADMIN_SUBJECTS_ROUTE))
 
 
 @admin_bp.route('/subjects/<int:id>/edit', methods=['POST'])
@@ -823,7 +872,7 @@ def add_fee_record():
     if not all([student_id, fee_type, amount_due, due_date, academic_year_id]):
         return jsonify({'error': 'student_id, fee_type, amount_due, due_date, and academic_year_id are required.'}), 400
 
-    student = Student.query.get_or_404(student_id)
+    Student.query.get_or_404(student_id)
     if not semester_id:
         return jsonify({'error': 'semester_id is required.'}), 400
     record = FeeRecord(
@@ -1069,31 +1118,8 @@ def class_sections():
 @admin_required
 def add_class_section():
     data = request.get_json(silent=True) or request.form
-    name = (data.get('name') or '').strip()
-    try:
-        if request.is_json:
-            department_id = int(data.get('department_id') or 0)
-            semester_id = int(data.get('semester_id') or 0)
-            academic_year_id = int(data.get('academic_year_id') or 0)
-            max_students = int(data.get('max_students') or 60)
-        else:
-            department_id = data.get('department_id', 0, type=int)
-            semester_id = data.get('semester_id', 0, type=int)
-            academic_year_id = data.get('academic_year_id', 0, type=int)
-            max_students = data.get('max_students', 60, type=int)
-    except (TypeError, ValueError):
-        department_id, semester_id, academic_year_id = 0, 0, 0
-        max_students = 0
-
-    message = None
-    if not all([name, department_id, semester_id, academic_year_id]) or max_students < 1:
-        message = 'Section name, department, semester, academic year, and valid capacity are required.'
-    else:
-        semester = Semester.query.get(semester_id)
-        if not Department.query.get(department_id) or not AcademicYear.query.get(academic_year_id):
-            message = 'Select a valid department and academic year.'
-        elif not semester or semester.department_id != department_id or semester.academic_year_id != academic_year_id:
-            message = 'Choose a semester that belongs to the selected department and academic year.'
+    name, department_id, semester_id, academic_year_id, max_students = _parse_class_section_inputs(data, request.is_json)
+    message = _validate_class_section_inputs(name, department_id, semester_id, academic_year_id, max_students)
 
     if message:
         if request.is_json:

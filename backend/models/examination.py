@@ -1,3 +1,4 @@
+CASCADE_DELETE_ORPHAN = "all, delete-orphan"
 # models/examination.py
 from datetime import datetime
 from extensions import db
@@ -70,13 +71,13 @@ class Exam(db.Model):
         "Question",
         back_populates="exam",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     attempts = db.relationship(
         "ExamAttempt",
         back_populates="exam",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
 
     def __repr__(self):
@@ -138,7 +139,7 @@ class Question(db.Model):
         "QuestionOption",
         back_populates="question",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     attempt_answers = db.relationship(
         "AttemptAnswer", back_populates="question", lazy="dynamic"
@@ -212,7 +213,7 @@ class ExamAttempt(db.Model):
         "AttemptAnswer",
         back_populates="attempt",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
 
     __table_args__ = (

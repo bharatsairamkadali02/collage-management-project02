@@ -1,3 +1,4 @@
+FACULTY_ID_FK = "faculty.id"
 # models/assignments.py
 from datetime import datetime
 from extensions import db
@@ -19,7 +20,7 @@ class Assignment(db.Model):
         db.Integer, db.ForeignKey("class_sections.id", ondelete="CASCADE"), nullable=False
     )
     faculty_id = db.Column(
-        db.Integer, db.ForeignKey("faculty.id", ondelete="CASCADE"), nullable=False
+        db.Integer, db.ForeignKey(FACULTY_ID_FK, ondelete="CASCADE"), nullable=False
     )
     created_by_id = synonym("faculty_id")
 
@@ -98,7 +99,7 @@ class AssignmentSubmission(db.Model):
         nullable=False,
     )
     graded_by_faculty_id = db.Column(
-        db.Integer, db.ForeignKey("faculty.id", ondelete="SET NULL"), nullable=True
+        db.Integer, db.ForeignKey(FACULTY_ID_FK, ondelete="SET NULL"), nullable=True
     )
     graded_at = db.Column(db.DateTime, nullable=True)
 
@@ -151,7 +152,7 @@ class StudyMaterial(db.Model):
         db.Integer, db.ForeignKey("class_sections.id", ondelete="SET NULL"), nullable=True
     )
     faculty_id = db.Column(
-        db.Integer, db.ForeignKey("faculty.id", ondelete="CASCADE"), nullable=False
+        db.Integer, db.ForeignKey(FACULTY_ID_FK, ondelete="CASCADE"), nullable=False
     )
     uploaded_by_id = synonym("faculty_id")
 

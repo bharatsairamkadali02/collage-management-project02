@@ -462,9 +462,18 @@ const PasswordStrength = {
 
     score = Object.values(checks).filter(Boolean).length;
 
+    let level = 'strong';
+    if (score <= 1) {
+      level = 'weak';
+    } else if (score <= 3) {
+      level = 'fair';
+    } else if (score <= 4) {
+      level = 'good';
+    }
+
     return {
       score,
-      level: score <= 1 ? 'weak' : score <= 3 ? 'fair' : score <= 4 ? 'good' : 'strong',
+      level,
       checks
     };
   },
@@ -600,7 +609,7 @@ async function submitAttendance(sessionId, formId) {
 
   try {
     Loader.show('Saving attendance...');
-    const data = await apiFetch('/faculty/api/attendance/mark', {
+    await apiFetch('/faculty/api/attendance/mark', {
       method: 'POST',
       body: JSON.stringify({ session_id: sessionId, records })
     });
@@ -779,12 +788,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Tooltips
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-    new bootstrap.Tooltip(el);
+    bootstrap.Tooltip.getOrCreateInstance(el);
   });
 
   // Popovers
   document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
-    new bootstrap.Popover(el);
+    bootstrap.Popover.getOrCreateInstance(el);
   });
 });
 

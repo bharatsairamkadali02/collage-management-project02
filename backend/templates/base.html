@@ -180,7 +180,7 @@
 <div id="wrapper">
 
   <!-- ══════════ SIDEBAR ══════════ -->
-  <nav id="sidebar">
+  <nav id="sidebar" aria-label="Main navigation">
     <a href="{{ url_for('admin.dashboard') if current_user.role == 'admin' else '/' }}" class="sidebar-brand">
       <div class="brand-icon"><i class="bi bi-mortarboard-fill"></i></div>
       <span>EduManage<br>Pro</span>
@@ -197,7 +197,7 @@
   <div style="flex:1; display:flex; flex-direction:column;">
 
     <!-- ══════════ TOPBAR ══════════ -->
-    <nav id="topbar">
+    <nav id="topbar" aria-label="Top navigation bar">
       <div class="topbar-left">
         <button id="sidebarToggle" title="Toggle sidebar" onclick="toggleSidebar()">
           <i class="bi bi-list"></i>

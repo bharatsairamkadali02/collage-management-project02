@@ -1,3 +1,4 @@
+ACADEMIC_YEARS_ID_FK = "academic_years.id"
 # models/class_section.py
 from datetime import datetime, date
 from extensions import db
@@ -24,7 +25,7 @@ class ClassSection(db.Model):
     )
     academic_year_id = db.Column(
         db.Integer,
-        db.ForeignKey("academic_years.id", ondelete="CASCADE"),
+        db.ForeignKey(ACADEMIC_YEARS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     max_students = db.Column(db.Integer, default=60, nullable=False)
@@ -113,7 +114,7 @@ class FacultyAssignment(db.Model):
     )
     academic_year_id = db.Column(
         db.Integer,
-        db.ForeignKey("academic_years.id", ondelete="CASCADE"),
+        db.ForeignKey(ACADEMIC_YEARS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     assigned_date = db.Column(db.Date, default=date.today, nullable=True)
@@ -161,7 +162,7 @@ class StudentEnrollment(db.Model):
     )
     academic_year_id = db.Column(
         db.Integer,
-        db.ForeignKey("academic_years.id", ondelete="CASCADE"),
+        db.ForeignKey(ACADEMIC_YEARS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     enrollment_date = db.Column(db.Date, default=date.today, nullable=True)

@@ -89,7 +89,7 @@ def create_session():
 @login_required
 @role_required("admin", "faculty")
 def get_session_records(session_id: int):
-    session = AttendanceSession.query.get_or_404(session_id)
+    AttendanceSession.query.get_or_404(session_id)
     records = AttendanceRecord.query.filter_by(session_id=session_id).all()
     return jsonify({
         "success": True,

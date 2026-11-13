@@ -1,3 +1,4 @@
+CASCADE_DELETE_ORPHAN = "all, delete-orphan"
 # models/user.py
 from datetime import datetime
 from flask_login import UserMixin
@@ -18,7 +19,7 @@ class Role(db.Model):
     # Relationships
     users = db.relationship("User", back_populates="role", lazy="dynamic")
     role_permissions = db.relationship(
-        "RolePermission", back_populates="role", cascade="all, delete-orphan"
+        "RolePermission", back_populates="role", cascade=CASCADE_DELETE_ORPHAN
     )
 
     @property
@@ -50,7 +51,7 @@ class Permission(db.Model):
 
     # Relationships
     role_permissions = db.relationship(
-        "RolePermission", back_populates="permission", cascade="all, delete-orphan"
+        "RolePermission", back_populates="permission", cascade=CASCADE_DELETE_ORPHAN
     )
 
     def __repr__(self):
@@ -120,10 +121,10 @@ class User(db.Model, UserMixin):
     # Relationships
     role = db.relationship("Role", back_populates="users")
     student_profile = db.relationship(
-        "Student", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "Student", back_populates="user", uselist=False, cascade=CASCADE_DELETE_ORPHAN
     )
     faculty_profile = db.relationship(
-        "Faculty", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "Faculty", back_populates="user", uselist=False, cascade=CASCADE_DELETE_ORPHAN
     )
     sent_notifications = db.relationship(
         "Notification",

@@ -40,6 +40,49 @@ def init_db(app) -> None:
             raise
 
 
+def _seed_roles_data(db, Role, roles_data):
+    role_objects = {}
+    for r_name, r_desc in roles_data:
+        role = Role.query.filter_by(role_name=r_name).first()
+        if not role:
+            role = Role(role_name=r_name, description=r_desc)
+            db.session.add(role)
+            db.session.flush()
+            logger.info("Created role: %s", r_name)
+        role_objects[r_name] = role
+    return role_objects
+
+
+def _seed_permissions_data(db, Permission, all_perms):
+    perm_objects = {}
+    for p_name in sorted(all_perms):
+        perm = Permission.query.filter_by(permission_name=p_name).first()
+        if not perm:
+            category = p_name.split("_")[0].lower() if "_" in p_name else "general"
+            perm = Permission(
+                permission_name=p_name,
+                description=p_name.replace("_", " ").title(),
+                category=category,
+            )
+            db.session.add(perm)
+            db.session.flush()
+        perm_objects[p_name] = perm
+    return perm_objects
+
+
+def _seed_role_permission_mappings(db, RolePermission, role_objects, perm_objects, role_map):
+    for r_name, p_set in role_map.items():
+        role = role_objects[r_name]
+        for p_name in p_set:
+            perm = perm_objects[p_name]
+            link = RolePermission.query.filter_by(
+                role_id=role.id, permission_id=perm.id
+            ).first()
+            if not link:
+                link = RolePermission(role_id=role.id, permission_id=perm.id)
+                db.session.add(link)
+
+
 def seed_roles(app=None) -> None:
     """
     Seed roles, permissions, and role_permission mappings.
@@ -54,60 +97,25 @@ def seed_roles(app=None) -> None:
     )
 
     def _seed():
-        # 1. Seed Roles
         roles_data = [
             ("Admin", "Full system superuser access. Complete authority over all modules."),
             ("Faculty", "Broad academic access for assigned departments, classes and subjects."),
             ("Student", "Restricted access to own academic records, attendance, and MCQ exams."),
         ]
+        role_objects = _seed_roles_data(db, Role, roles_data)
 
-        role_objects = {}
-        for r_name, r_desc in roles_data:
-            role = Role.query.filter_by(role_name=r_name).first()
-            if not role:
-                role = Role(role_name=r_name, description=r_desc)
-                db.session.add(role)
-                db.session.flush()
-                logger.info("Created role: %s", r_name)
-            role_objects[r_name] = role
-
-        # 2. Seed Permissions
         all_perms = set()
         all_perms.update(ADMIN_PERMISSIONS)
         all_perms.update(FACULTY_PERMISSIONS)
         all_perms.update(STUDENT_PERMISSIONS)
+        perm_objects = _seed_permissions_data(db, Permission, all_perms)
 
-        perm_objects = {}
-        for p_name in sorted(all_perms):
-            perm = Permission.query.filter_by(permission_name=p_name).first()
-            if not perm:
-                category = p_name.split("_")[0].lower() if "_" in p_name else "general"
-                perm = Permission(
-                    permission_name=p_name,
-                    description=p_name.replace("_", " ").title(),
-                    category=category,
-                )
-                db.session.add(perm)
-                db.session.flush()
-            perm_objects[p_name] = perm
-
-        # 3. Seed RolePermissions
         role_map = {
             "Admin": ADMIN_PERMISSIONS,
             "Faculty": FACULTY_PERMISSIONS,
             "Student": STUDENT_PERMISSIONS,
         }
-
-        for r_name, p_set in role_map.items():
-            role = role_objects[r_name]
-            for p_name in p_set:
-                perm = perm_objects[p_name]
-                link = RolePermission.query.filter_by(
-                    role_id=role.id, permission_id=perm.id
-                ).first()
-                if not link:
-                    link = RolePermission(role_id=role.id, permission_id=perm.id)
-                    db.session.add(link)
+        _seed_role_permission_mappings(db, RolePermission, role_objects, perm_objects, role_map)
 
         db.session.commit()
         logger.info("Roles and permissions successfully seeded.")
@@ -117,6 +125,107 @@ def seed_roles(app=None) -> None:
             _seed()
     else:
         _seed()
+
+
+def _seed_departments(db, Department, departments_data):
+    departments = []
+    for name, code, description in departments_data:
+        department = Department.query.filter_by(code=code).first()
+        if department is None:
+            department = Department.query.filter_by(name=name).first()
+        if department is None:
+            department = Department(
+                name=name,
+                code=code,
+                description=description,
+                is_active=True,
+            )
+            db.session.add(department)
+            db.session.flush()
+        departments.append(department)
+    return departments
+
+
+def _get_or_create_academic_year(db, AcademicYear):
+    academic_year = (
+        AcademicYear.query.filter_by(is_current=True)
+        .order_by(AcademicYear.start_date.desc())
+        .first()
+    )
+    if academic_year is not None:
+        return academic_year
+
+    today = date.today()
+    start_year = today.year if today.month >= 6 else today.year - 1
+    year_label = f"{start_year}-{start_year + 1}"
+    academic_year = AcademicYear.query.filter_by(year_label=year_label).first()
+    if academic_year is None:
+        academic_year = AcademicYear(
+            year_label=year_label,
+            start_date=date(start_year, 6, 1),
+            end_date=date(start_year + 1, 5, 31),
+            is_current=True,
+        )
+        db.session.add(academic_year)
+        db.session.flush()
+    else:
+        academic_year.is_current = True
+    return academic_year
+
+
+def _seed_department_semesters(db, department, academic_year, section_names, Semester, ClassSection):
+    department_semesters = {}
+    for semester_number in range(1, 9):
+        semester = Semester.query.filter_by(
+            department_id=department.id,
+            academic_year_id=academic_year.id,
+            semester_number=semester_number,
+        ).first()
+        if semester is None:
+            semester = Semester(
+                semester_number=semester_number,
+                semester_name=f"Semester {semester_number}",
+                academic_year_id=academic_year.id,
+                department_id=department.id,
+                is_current=False,
+            )
+            db.session.add(semester)
+            db.session.flush()
+        department_semesters[semester_number] = semester
+
+        for section_name in section_names:
+            exists = ClassSection.query.filter_by(
+                section_name=section_name,
+                department_id=department.id,
+                semester_id=semester.id,
+                academic_year_id=academic_year.id,
+            ).first()
+            if exists is None:
+                db.session.add(ClassSection(
+                    section_name=section_name,
+                    department_id=department.id,
+                    semester_id=semester.id,
+                    academic_year_id=academic_year.id,
+                    max_students=60,
+                ))
+    return department_semesters
+
+
+def _seed_department_subjects(db, department, department_semesters, subjects_list, Subject):
+    for index, subject_name in enumerate(subjects_list, start=1):
+        subject_code = f"{department.code}{100 + index}"
+        if Subject.query.filter_by(code=subject_code).first() is None:
+            db.session.add(Subject(
+                subject_name=subject_name,
+                subject_code=subject_code,
+                department_id=department.id,
+                semester_id=department_semesters[index].id,
+                credits=4,
+                max_internal_marks=40,
+                max_external_marks=60,
+                subject_type="theory",
+                is_active=True,
+            ))
 
 
 def seed_academic_structure(app=None) -> None:
@@ -191,96 +300,15 @@ def seed_academic_structure(app=None) -> None:
     }
 
     def _seed():
-        departments = []
-        for name, code, description in departments_data:
-            department = Department.query.filter_by(code=code).first()
-            if department is None:
-                department = Department.query.filter_by(name=name).first()
-            if department is None:
-                department = Department(
-                    name=name,
-                    code=code,
-                    description=description,
-                    is_active=True,
-                )
-                db.session.add(department)
-                db.session.flush()
-            departments.append(department)
-
-        academic_year = (
-            AcademicYear.query.filter_by(is_current=True)
-            .order_by(AcademicYear.start_date.desc())
-            .first()
-        )
-        if academic_year is None:
-            today = date.today()
-            start_year = today.year if today.month >= 6 else today.year - 1
-            year_label = f"{start_year}-{start_year + 1}"
-            academic_year = AcademicYear.query.filter_by(year_label=year_label).first()
-            if academic_year is None:
-                academic_year = AcademicYear(
-                    year_label=year_label,
-                    start_date=date(start_year, 6, 1),
-                    end_date=date(start_year + 1, 5, 31),
-                    is_current=True,
-                )
-                db.session.add(academic_year)
-                db.session.flush()
-            else:
-                academic_year.is_current = True
+        departments = _seed_departments(db, Department, departments_data)
+        academic_year = _get_or_create_academic_year(db, AcademicYear)
 
         for department in departments:
-            department_semesters = {}
-            for semester_number in range(1, 9):
-                semester = Semester.query.filter_by(
-                    department_id=department.id,
-                    academic_year_id=academic_year.id,
-                    semester_number=semester_number,
-                ).first()
-                if semester is None:
-                    semester = Semester(
-                        semester_number=semester_number,
-                        semester_name=f"Semester {semester_number}",
-                        academic_year_id=academic_year.id,
-                        department_id=department.id,
-                        is_current=False,
-                    )
-                    db.session.add(semester)
-                    db.session.flush()
-                department_semesters[semester_number] = semester
-
-                for section_name in section_names:
-                    exists = ClassSection.query.filter_by(
-                        section_name=section_name,
-                        department_id=department.id,
-                        semester_id=semester.id,
-                        academic_year_id=academic_year.id,
-                    ).first()
-                    if exists is None:
-                        db.session.add(ClassSection(
-                            section_name=section_name,
-                            department_id=department.id,
-                            semester_id=semester.id,
-                            academic_year_id=academic_year.id,
-                            max_students=60,
-                        ))
-
-            for index, subject_name in enumerate(
-                subjects_by_department.get(department.code, []), start=1
-            ):
-                subject_code = f"{department.code}{100 + index}"
-                if Subject.query.filter_by(code=subject_code).first() is None:
-                    db.session.add(Subject(
-                        subject_name=subject_name,
-                        subject_code=subject_code,
-                        department_id=department.id,
-                        semester_id=department_semesters[index].id,
-                        credits=4,
-                        max_internal_marks=40,
-                        max_external_marks=60,
-                        subject_type="theory",
-                        is_active=True,
-                    ))
+            department_semesters = _seed_department_semesters(
+                db, department, academic_year, section_names, Semester, ClassSection
+            )
+            subjects_list = subjects_by_department.get(department.code, [])
+            _seed_department_subjects(db, department, department_semesters, subjects_list, Subject)
 
         db.session.commit()
         logger.info("Academic departments, semesters, and sections successfully seeded.")

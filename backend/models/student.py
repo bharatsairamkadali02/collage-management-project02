@@ -1,3 +1,4 @@
+CASCADE_DELETE_ORPHAN = "all, delete-orphan"
 # models/student.py
 from datetime import datetime
 from extensions import db
@@ -92,43 +93,43 @@ class Student(db.Model):
         "StudentEnrollment",
         back_populates="student",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     attendance_records = db.relationship(
         "AttendanceRecord",
         back_populates="student",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     exam_attempts = db.relationship(
         "ExamAttempt",
         back_populates="student",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     results = db.relationship(
         "Result",
         back_populates="student",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     fee_records = db.relationship(
         "FeeRecord",
         back_populates="student",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     assignment_submissions = db.relationship(
         "AssignmentSubmission",
         back_populates="student",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     documents = db.relationship(
         "StudentDocument",
         back_populates="student",
         lazy="dynamic",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_DELETE_ORPHAN,
     )
     notifications = db.relationship(
         "Notification",

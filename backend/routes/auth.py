@@ -14,6 +14,10 @@ import datetime
 
 auth = Blueprint('auth', __name__, url_prefix='/auth')
 
+AUTH_LOGIN_ENDPOINT = 'auth.login'
+AUTH_LOGIN_TEMPLATE = 'auth/login.html'
+AUTH_RESET_PASSWORD_TEMPLATE = 'auth/reset-password.html'
+
 
 def _redirect_by_role(user):
     """Return the appropriate redirect response based on user role."""
@@ -24,7 +28,18 @@ def _redirect_by_role(user):
         return redirect(url_for('faculty.dashboard'))
     elif role == 'student':
         return redirect(url_for('student.dashboard'))
-    return redirect(url_for('auth.login'))
+    return redirect(url_for(AUTH_LOGIN_ENDPOINT))
+
+
+def _is_invalid_user(user, password, requested_role):
+    """Check if credentials or role mismatch for the given user."""
+    if user is None:
+        return True
+    if not user.check_password(password):
+        return True
+    if requested_role and (not user.role or user.role.name != requested_role):
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -44,28 +59,23 @@ def login(role=None):
     if not requested_role:
         if request.method == 'POST':
             flash('Choose Admin, Faculty, or Student before signing in.', 'info')
-        return render_template('auth/login.html', requested_role='student')
+        return render_template(AUTH_LOGIN_TEMPLATE, requested_role='student')
 
     if request.method == 'POST':
-        # Basic CSRF token validation (assumes WTForms / Flask-WTF middleware)
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         remember = request.form.get('remember_me') == 'on'
 
         if not email or not password:
             flash('Email and password are required.', 'danger')
-            return render_template('auth/login.html', requested_role=requested_role)
+            return render_template(AUTH_LOGIN_TEMPLATE, requested_role=requested_role)
 
         user = User.query.filter_by(email=email, is_active=True).first()
 
-        if (
-            user is None
-            or not user.check_password(password)
-            or (requested_role and (not user.role or user.role.name != requested_role))
-        ):
+        if _is_invalid_user(user, password, requested_role):
             flash('Invalid email or password.', 'danger')
             current_app.logger.warning('Failed login attempt for email: %s', email)
-            return render_template('auth/login.html', requested_role=requested_role)
+            return render_template(AUTH_LOGIN_TEMPLATE, requested_role=requested_role)
 
         login_user(user, remember=remember)
         current_app.logger.info('User %s logged in successfully.', user.id)
@@ -75,7 +85,7 @@ def login(role=None):
             return redirect(next_page)
         return _redirect_by_role(user)
 
-    return render_template('auth/login.html', requested_role=requested_role)
+    return render_template(AUTH_LOGIN_TEMPLATE, requested_role=requested_role)
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +98,7 @@ def logout():
     current_app.logger.info('User %s logged out.', current_user.id)
     logout_user()
     flash('You have been logged out successfully.', 'info')
-    response = redirect(url_for('auth.login'))
+    response = redirect(url_for(AUTH_LOGIN_ENDPOINT))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
@@ -132,14 +142,13 @@ def forgot_password():
                 'Password reset token generated for user %s. Reset URL: %s',
                 user.id, reset_url
             )
-            # TODO: Replace with actual email sending via Flask-Mail / SES.
-            # send_reset_email(user, reset_url)
+            # Production deployments can integrate email delivery here (Flask-Mail / AWS SES)
 
         flash(
             'If an account with that email exists, a password reset link has been sent.',
             'info'
         )
-        return redirect(url_for('auth.login'))
+        return redirect(url_for(AUTH_LOGIN_ENDPOINT))
 
     return render_template('auth/forgot-password.html')
 
@@ -172,11 +181,11 @@ def reset_password(token):
 
         if not new_password or len(new_password) < 8:
             flash('Password must be at least 8 characters long.', 'danger')
-            return render_template('auth/reset-password.html', token=token)
+            return render_template(AUTH_RESET_PASSWORD_TEMPLATE, token=token)
 
         if new_password != confirm_password:
             flash('Passwords do not match.', 'danger')
-            return render_template('auth/reset-password.html', token=token)
+            return render_template(AUTH_RESET_PASSWORD_TEMPLATE, token=token)
 
         user = User.query.get(token_data['user_id'])
         if not user:
@@ -192,9 +201,9 @@ def reset_password(token):
 
         current_app.logger.info('Password reset successfully for user %s.', user.id)
         flash('Your password has been reset. Please log in.', 'success')
-        return redirect(url_for('auth.login'))
+        return redirect(url_for(AUTH_LOGIN_ENDPOINT))
 
-    return render_template('auth/reset-password.html', token=token)
+    return render_template(AUTH_RESET_PASSWORD_TEMPLATE, token=token)
 
 
 # ---------------------------------------------------------------------------

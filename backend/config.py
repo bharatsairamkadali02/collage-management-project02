@@ -108,7 +108,7 @@ class DevelopmentConfig(Config):
     # Use a local MySQL or SQLite fallback for quick bootstrapping
     SQLALCHEMY_DATABASE_URI: str = os.environ.get(
         "DATABASE_URL",
-        f"mysql+pymysql://root:@localhost:3306/college_management_dev?charset=utf8mb4",
+        _build_db_uri(),
     )
 
     # Tighter pool for local dev

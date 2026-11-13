@@ -142,6 +142,8 @@ def _configure_logging(app: Flask) -> None:
 def _register_blueprints(app: Flask) -> None:
     """Import and register all application blueprints."""
 
+    home_template = "public/home.html"
+
     # Root redirect
     @app.route("/")
     def index():
@@ -153,15 +155,15 @@ def _register_blueprints(app: Flask) -> None:
                 return redirect(url_for("faculty.dashboard"))
             elif role == "student":
                 return redirect(url_for("student.dashboard"))
-        return render_template("public/home.html", page="home", drawer_open=True)
+        return render_template(home_template, page="home", drawer_open=True)
 
     @app.route("/about")
     def about():
-        return render_template("public/home.html", page="about", drawer_open=False)
+        return render_template(home_template, page="about", drawer_open=False)
 
     @app.route("/departments")
     def public_departments():
-        return render_template("public/home.html", page="home", drawer_open=True)
+        return render_template(home_template, page="home", drawer_open=True)
 
     # Auth
     from routes.auth import auth as auth_bp

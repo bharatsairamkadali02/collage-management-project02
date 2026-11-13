@@ -12,7 +12,7 @@
   {% endfor %}
 </div>
 <div class="row g-3">
-  <div class="col-lg-7"><div class="card h-100"><div class="card-header bg-white d-flex justify-content-between"><strong>Recent student registrations</strong><a href="{{ url_for('admin.students') }}">View all</a></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Status</th></tr></thead><tbody>
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header bg-white d-flex justify-content-between"><strong>Recent student registrations</strong><a href="{{ url_for('admin.students') }}">View all</a></div><div class="table-responsive"><table class="table mb-0" aria-label="Recent student registrations"><thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Status</th></tr></thead><tbody>
   {% for student in recent_registrations %}<tr><td>{{ student.user.get_full_name() if student.user else '—' }}</td><td>{{ student.student_roll_number }}</td><td>{{ student.department.department_name if student.department else '—' }}</td><td>{{ student.academic_status|title }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No students registered yet.</td></tr>{% endfor %}
   </tbody></table></div></div></div>
   <div class="col-lg-5"><div class="card h-100"><div class="card-header bg-white"><strong>Upcoming examinations</strong></div><div class="list-group list-group-flush">
