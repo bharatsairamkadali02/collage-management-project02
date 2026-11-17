@@ -1,34 +1,32 @@
 # ---- Build Stage ----
 FROM python:3.11-slim-bookworm AS builder
 
-# Install build dependencies
+# Install build tools if any wheels need compiling
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential \
-        pkg-config \
-        default-libmysqlclient-dev && \
+        build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# Install Python dependencies into a virtual environment
+# Create virtual environment and upgrade packaging tools to patched versions
 COPY backend/requirements.txt .
 RUN python -m venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade "pip>=26.2.0" "setuptools>=84.1.0" "wheel>=0.46.2" && \
     /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # ---- Runtime Stage ----
 FROM python:3.11-slim-bookworm
 
-# Apply all OS security patches
+# Apply OS security patches and install only curl for healthcheck
+# (default-libmysqlclient-dev / mariadb-common is omitted since PyMySQL is pure Python)
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-        default-libmysqlclient-dev \
-        curl && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Create a non-root user
+# Create dedicated non-root application user
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid 1000 --no-create-home --shell /usr/sbin/nologin appuser
 
@@ -46,15 +44,16 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
-# Add venv to PATH
+# Environment variables
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 EXPOSE 5000
 
+# Container healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl --fail http://localhost:5000/health || exit 1
 
-# Run with Gunicorn
+# Start Gunicorn server
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "120", "backend.app:app"]
