@@ -54,11 +54,15 @@ COPY backend/ ./backend/
 # Set ownership
 RUN chown -R appuser:appuser /app
 
+# Set working directory to backend where app.py, config.py, and templates live
+WORKDIR /app/backend
+
 # Switch to non-root user
 USER appuser
 
 # Environment variables
 ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app/backend:$PYTHONPATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
@@ -69,4 +73,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl --fail http://localhost:5000/health || exit 1
 
 # Start Gunicorn server
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "120", "backend.app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "120", "app:app"]
