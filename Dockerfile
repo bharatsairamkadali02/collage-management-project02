@@ -26,11 +26,17 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Remove outdated default pip/setuptools from system python (/usr/local/)
-# The application runs inside /opt/venv with fully patched packages
+# Remove all unpatched legacy packaging tools (setuptools 70.3.0, pip, wheel) from the base OS
+# The application runs strictly inside /opt/venv which contains fully patched versions
 RUN rm -rf /usr/local/lib/python3.11/site-packages/* \
+           /usr/local/lib/python3.11/dist-packages/* \
+           /usr/lib/python3/dist-packages/setuptools* \
+           /usr/share/python-wheels/* \
            /usr/local/bin/pip* \
-           /usr/local/bin/wheel*
+           /usr/local/bin/wheel* \
+           /root/.cache /root/.local && \
+    find /usr -name "*setuptools*" -not -path "/opt/venv/*" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr -name "*pip*" -not -path "/opt/venv/*" -exec rm -rf {} + 2>/dev/null || true
 
 # Create dedicated non-root application user
 RUN groupadd --gid 1000 appuser && \
