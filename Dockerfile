@@ -26,6 +26,12 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# Remove outdated default pip/setuptools from system python (/usr/local/)
+# The application runs inside /opt/venv with fully patched packages
+RUN rm -rf /usr/local/lib/python3.11/site-packages/* \
+           /usr/local/bin/pip* \
+           /usr/local/bin/wheel*
+
 # Create dedicated non-root application user
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid 1000 --no-create-home --shell /usr/sbin/nologin appuser
