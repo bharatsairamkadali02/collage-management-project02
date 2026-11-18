@@ -15,11 +15,11 @@ load_dotenv()
 
 def _build_db_uri() -> str:
     """Construct the MySQL connection URI from individual env variables."""
-    host = os.environ.get("DATABASE_HOST", "localhost")
-    port = os.environ.get("DATABASE_PORT", "3306")
-    name = os.environ.get("DATABASE_NAME", "college_management")
-    user = os.environ.get("DATABASE_USER", "root")
-    password = os.environ.get("DATABASE_PASSWORD", "")
+    host = os.environ.get("DATABASE_HOST") or os.environ.get("DB_HOST", "localhost")
+    port = os.environ.get("DATABASE_PORT") or os.environ.get("DB_PORT", "3306")
+    name = os.environ.get("DATABASE_NAME") or os.environ.get("DB_NAME", "college_management")
+    user = os.environ.get("DATABASE_USER") or os.environ.get("DB_USER", "root")
+    password = os.environ.get("DATABASE_PASSWORD") or os.environ.get("DB_PASSWORD", "")
     return URL.create(
         "mysql+pymysql",
         username=user,
