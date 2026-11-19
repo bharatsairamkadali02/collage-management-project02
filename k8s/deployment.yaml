@@ -1,0 +1,93 @@
+# ──────────────────────────────────────────────────────────
+# deployment.yaml
+# Tells Kubernetes HOW to run your app.
+# - 2 replicas = 2 copies of the pod running at all times
+# - Pulls image from Docker Hub
+# - Injects env vars from ConfigMap and Secret
+# - Has liveness and readiness health checks
+# ──────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: college-app
+  namespace: college-management
+  labels:
+    app: college-app
+spec:
+  replicas: 2                     # Run 2 pods for high availability
+  selector:
+    matchLabels:
+      app: college-app
+  strategy:
+    type: RollingUpdate           # Update pods one-by-one (zero downtime)
+    rollingUpdate:
+      maxSurge: 1                 # Allow 1 extra pod during update
+      maxUnavailable: 0           # Never take a pod down before new one is ready
+  template:
+    metadata:
+      labels:
+        app: college-app
+    spec:
+      containers:
+        - name: college-app
+          image: kadalibharatsairam01/college-management:latest
+          imagePullPolicy: Always  # Always pull latest image on pod start
+
+          ports:
+            - containerPort: 5000  # Port Gunicorn listens on INSIDE the container
+
+          # ── Environment Variables from ConfigMap (non-sensitive) ──
+          envFrom:
+            - configMapRef:
+                name: college-app-config
+
+          # ── Sensitive env vars from Secret ──
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: college-app-secret
+                  key: DB_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: college-app-secret
+                  key: SECRET_KEY
+            - name: INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: college-app-secret
+                  key: INITIAL_ADMIN_PASSWORD
+
+          # ── Resource Limits ──
+          # Prevents one pod from consuming all EC2 memory/CPU
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # ── Readiness Probe ──
+          # Kubernetes won't send traffic to a pod until this passes
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15   # Wait 15s after start before first check
+            periodSeconds: 10          # Check every 10 seconds
+            failureThreshold: 3        # Mark unhealthy after 3 failures
+
+          # ── Liveness Probe ──
+          # Kubernetes will RESTART the pod if this fails
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30   # Give the app 30s to fully start
+            periodSeconds: 15
+            failureThreshold: 3
+
+      # ── Restart Policy ──
+      restartPolicy: Always

@@ -1,0 +1,11 @@
+# ──────────────────────────────────────────────────────────
+# namespace.yaml
+# Creates a dedicated Kubernetes namespace for the app.
+# All other resources will be created inside this namespace.
+# ──────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: college-management
+  labels:
+    app: college-management

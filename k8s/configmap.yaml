@@ -1,0 +1,19 @@
+# ──────────────────────────────────────────────────────────
+# configmap.yaml
+# Stores NON-SENSITIVE configuration as key-value pairs.
+# These are injected as environment variables into the pods.
+# ──────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: college-app-config
+  namespace: college-management
+data:
+  FLASK_ENV: "development"
+  DB_HOST: "college-management-rds.c5k2wsog2wjy.ap-south-1.rds.amazonaws.com"
+  DB_PORT: "3306"
+  DB_NAME: "college_management"
+  DB_USER: "admin"
+  AWS_REGION: "ap-south-1"
+  S3_BUCKET_NAME: "college-management-system111232"
+  INITIAL_ADMIN_EMAIL: "admin@college.edu"

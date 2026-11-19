@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────────────────
+# service.yaml
+# Exposes your pods to traffic.
+# LoadBalancer type = AWS automatically creates an ELB
+# (Elastic Load Balancer) so the app is accessible from internet.
+# ──────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: college-app-service
+  namespace: college-management
+  annotations:
+    # AWS-specific: makes this an internet-facing load balancer
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  selector:
+    app: college-app             # Routes traffic to pods with this label
+  type: LoadBalancer             # AWS creates an ELB automatically
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80                   # Port exposed to the internet (browser)
+      targetPort: 5000           # Port Gunicorn listens on inside the container
