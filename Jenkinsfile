@@ -1,28 +1,30 @@
 // ══════════════════════════════════════════════════════════════════════
-//  EduManage Pro — Jenkins CI/CD Pipeline
+//  EduManage Pro — Full CI/CD Pipeline with Infrastructure as Code
 //  Repo   : https://github.com/bharatsairamkadali02/collage-management-project02.git
 //  Image  : kadalibharatsairam01/college-management
-//  Deploy : AWS EKS (2-tier — Flask app + RDS MySQL)
-// ══════════════════════════════════════════════════════════════════════
-//
-// JENKINS CREDENTIALS REQUIRED (Settings → Manage Jenkins → Credentials):
-//   dockerhub-creds   → Username/Password  (DockerHub login)
-//   aws-credentials   → AWS Access Key ID + Secret (kind: AWS Credentials)
-//   rds-password      → Secret text  (your RDS MySQL password)
-//
-// JENKINS PLUGINS REQUIRED:
-//   Docker Pipeline, AWS Credentials, Pipeline, Git, Kubernetes CLI
-//
+//  Infra  : Complete AWS (VPC, EKS Cluster, Worker Nodes, RDS MySQL, S3)
 // ══════════════════════════════════════════════════════════════════════
 
 pipeline {
     agent any
 
-    // ── Global environment variables ─────────────────────────────────
+    parameters {
+        booleanParam(
+            name: 'PROVISION_INFRA',
+            defaultValue: false,
+            description: 'Check this to create/update the ENTIRE new AWS infrastructure (VPC, EKS, RDS, S3) using Terraform'
+        )
+        booleanParam(
+            name: 'DESTROY_INFRA',
+            defaultValue: false,
+            description: 'DANGER: Check this to destroy the infrastructure created by Terraform'
+        )
+    }
+
     environment {
         // Docker Hub
         DOCKER_IMAGE      = "kadalibharatsairam01/college-management"
-        DOCKER_TAG        = "${BUILD_NUMBER}"          // e.g. :42
+        DOCKER_TAG        = "${BUILD_NUMBER}"
         DOCKER_LATEST     = "${DOCKER_IMAGE}:latest"
         DOCKER_VERSIONED  = "${DOCKER_IMAGE}:${DOCKER_TAG}"
 
@@ -30,172 +32,40 @@ pipeline {
         GIT_REPO          = "https://github.com/bharatsairamkadali02/collage-management-project02.git"
         GIT_BRANCH        = "main"
 
-        // AWS / EKS
+        // AWS / EKS Defaults
         AWS_REGION        = "ap-south-1"
         EKS_CLUSTER_NAME  = "my-eks-cluster"
 
         // Application
         APP_NAME          = "college-app"
         K8S_DIR           = "k8s"
+        INFRA_DIR         = "infrastructure"
 
-        // RDS (non-sensitive — host only; password comes from Jenkins credential)
+        // Database Default fallback
         DB_HOST           = "college-management-rds.c5k2wsog2wjy.ap-south-1.rds.amazonaws.com"
         DB_NAME           = "college_management"
         DB_USER           = "admin"
         DB_PORT           = "3306"
     }
 
-    // ── Build options ─────────────────────────────────────────────────
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 60, unit: 'MINUTES')
+        timeout(time: 90, unit: 'MINUTES')
         disableConcurrentBuilds()
         timestamps()
     }
 
-    // ── Pipeline stages ───────────────────────────────────────────────
     stages {
 
         // ──────────────────────────────────────────────────────────────
-        // STAGE 1: Clone source code from GitHub
+        // STAGE 0: Destroy Infrastructure (If Requested)
         // ──────────────────────────────────────────────────────────────
-        stage('1. Clone Repository') {
-            steps {
-                echo "============================================"
-                echo "  Cloning from: ${GIT_REPO}"
-                echo "  Branch      : ${GIT_BRANCH}"
-                echo "============================================"
-                git branch: "${GIT_BRANCH}",
-                    url: "${GIT_REPO}"
-
-                sh 'ls -la'
-                sh 'echo "Repository cloned successfully ✓"'
+        stage('0. Destroy Infrastructure (Optional)') {
+            when {
+                expression { return params.DESTROY_INFRA == true }
             }
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // STAGE 2: Build Docker Image
-        // ──────────────────────────────────────────────────────────────
-        stage('2. Build Docker Image') {
             steps {
-                echo "============================================"
-                echo "  Building image: ${DOCKER_VERSIONED}"
-                echo "============================================"
-                sh """
-                    docker build --no-cache \\
-                        -t ${DOCKER_VERSIONED} \\
-                        -t ${DOCKER_LATEST} \\
-                        .
-
-                    echo "Image built successfully ✓"
-                    docker images | grep college-management
-                """
-            }
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // STAGE 3: Trivy Security Scan
-        //   - Scans image for CVEs
-        //   - Saves a report as an artifact
-        //   - Uses .trivyignore (already in repo) to suppress phantom CVEs
-        //   - Pipeline FAILS if any CRITICAL vulnerability is found
-        // ──────────────────────────────────────────────────────────────
-        stage('3. Trivy Security Scan') {
-            steps {
-                echo "============================================"
-                echo "  Scanning image for vulnerabilities..."
-                echo "============================================"
-                sh """
-                    # Install Trivy if not present
-                    if ! command -v trivy &> /dev/null; then
-                        echo "Installing Trivy..."
-                        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
-                        echo "deb https://aquasecurity.github.io/trivy-repo/deb \$(lsb_release -sc) main" \\
-                            | tee /etc/apt/sources.list.d/trivy.list
-                        apt-get update -qq && apt-get install -y trivy
-                    fi
-
-                    echo "Trivy version: \$(trivy --version)"
-
-                    # Run scan — ignore unfixed CVEs, use .trivyignore from repo
-                    trivy image \\
-                        --ignore-unfixed \\
-                        --severity HIGH,CRITICAL \\
-                        --format table \\
-                        --output trivy-report.txt \\
-                        ${DOCKER_LATEST}
-
-                    echo "──── Scan Summary ────"
-                    cat trivy-report.txt
-
-                    # Count CRITICAL findings and fail if any found
-                    CRITICAL_COUNT=\$(trivy image --ignore-unfixed --severity CRITICAL \\
-                        --format json ${DOCKER_LATEST} 2>/dev/null | \\
-                        python3 -c "import json,sys; d=json.load(sys.stdin); \\
-                        print(sum(len([v for v in (r.get('Vulnerabilities') or []) \\
-                        if v.get('Severity')=='CRITICAL']) \\
-                        for r in (d.get('Results') or [])))" 2>/dev/null || echo 0)
-
-                    echo "CRITICAL vulnerabilities found: \$CRITICAL_COUNT"
-
-                    if [ "\$CRITICAL_COUNT" -gt "0" ]; then
-                        echo "❌ PIPELINE FAILED: Critical vulnerabilities detected!"
-                        exit 1
-                    fi
-
-                    echo "✅ No critical vulnerabilities — image is safe!"
-                """
-            }
-            post {
-                always {
-                    // Archive scan report as a Jenkins artifact
-                    archiveArtifacts artifacts: 'trivy-report.txt',
-                                     allowEmptyArchive: true
-                }
-            }
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // STAGE 4: Push Image to Docker Hub
-        // ──────────────────────────────────────────────────────────────
-        stage('4. Push to Docker Hub') {
-            steps {
-                echo "============================================"
-                echo "  Pushing to Docker Hub..."
-                echo "============================================"
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
-
-                        docker push ${DOCKER_VERSIONED}
-                        docker push ${DOCKER_LATEST}
-
-                        echo "✅ Image pushed to Docker Hub:"
-                        echo "   ${DOCKER_VERSIONED}"
-                        echo "   ${DOCKER_LATEST}"
-
-                        docker logout
-                    """
-                }
-            }
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // STAGE 5: Create / Update Infrastructure (EKS + Nodes)
-        //   - If EKS cluster already exists → skips creation
-        //   - If EKS cluster does not exist → creates it (~15 min)
-        //   - Then configures kubectl
-        // ──────────────────────────────────────────────────────────────
-        stage('5. Create Infrastructure (EKS)') {
-            steps {
-                echo "============================================"
-                echo "  Setting up EKS cluster: ${EKS_CLUSTER_NAME}"
-                echo "  Region: ${AWS_REGION}"
-                echo "============================================"
+                echo "⚠️  DESTROYING ENTIRE AWS INFRASTRUCTURE..."
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials',
@@ -203,68 +73,165 @@ pipeline {
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
                     sh """
-                        export AWS_ACCESS_KEY_ID=\$AWS_ACCESS_KEY_ID
-                        export AWS_SECRET_ACCESS_KEY=\$AWS_SECRET_ACCESS_KEY
-                        export AWS_DEFAULT_REGION=${AWS_REGION}
-
-                        # Install eksctl if not present
-                        if ! command -v eksctl &> /dev/null; then
-                            echo "Installing eksctl..."
-                            ARCH=amd64
-                            PLATFORM=\$(uname -s)_\$ARCH
-                            curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_\${PLATFORM}.tar.gz"
-                            tar -xzf eksctl_\${PLATFORM}.tar.gz -C /tmp
-                            mv /tmp/eksctl /usr/local/bin/
-                        fi
-
-                        # Install kubectl if not present
-                        if ! command -v kubectl &> /dev/null; then
-                            echo "Installing kubectl..."
-                            curl -LO "https://dl.k8s.io/release/\$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                            chmod +x kubectl && mv kubectl /usr/local/bin/
-                        fi
-
-                        # Check if cluster already exists
-                        if aws eks describe-cluster --name ${EKS_CLUSTER_NAME} --region ${AWS_REGION} 2>/dev/null; then
-                            echo "✅ EKS cluster '${EKS_CLUSTER_NAME}' already exists — skipping creation."
-                        else
-                            echo "Creating EKS cluster... (this takes ~15 minutes)"
-                            eksctl create cluster \\
-                                --name ${EKS_CLUSTER_NAME} \\
-                                --region ${AWS_REGION} \\
-                                --nodegroup-name college-nodes \\
-                                --node-type t3.medium \\
-                                --nodes 2 \\
-                                --nodes-min 1 \\
-                                --nodes-max 3 \\
-                                --managed
-                            echo "✅ EKS cluster created!"
-                        fi
-
-                        # Configure kubectl to talk to this cluster
-                        aws eks update-kubeconfig \\
-                            --region ${AWS_REGION} \\
-                            --name ${EKS_CLUSTER_NAME}
-
-                        echo "── Cluster Nodes ──"
-                        kubectl get nodes
+                        cd ${INFRA_DIR}
+                        terraform init
+                        terraform destroy -auto-approve
                     """
                 }
             }
         }
 
         // ──────────────────────────────────────────────────────────────
-        // STAGE 6: Deploy Application to EKS (2-Tier Architecture)
-        //   Tier 1 (Frontend/App): Flask + Gunicorn pods on EKS
-        //   Tier 2 (Database)    : Existing AWS RDS MySQL
+        // STAGE 1: Clone Repository
         // ──────────────────────────────────────────────────────────────
-        stage('6. Deploy to EKS (2-Tier)') {
+        stage('1. Clone Repository') {
+            steps {
+                echo "Cloning source code from ${GIT_REPO}..."
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+                sh 'ls -la'
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // STAGE 2: Provision Entire New AWS Infrastructure (Terraform)
+        // ──────────────────────────────────────────────────────────────
+        stage('2. Provision Entire AWS Infrastructure') {
+            when {
+                expression { return params.PROVISION_INFRA == true }
+            }
             steps {
                 echo "============================================"
-                echo "  Deploying 2-Tier Architecture:"
-                echo "  Tier 1: Flask App (EKS Pods)"
-                echo "  Tier 2: RDS MySQL (${DB_HOST})"
+                echo "  Provisioning New AWS Infrastructure:"
+                echo "  • Unified VPC + Subnets (Multi-AZ)"
+                echo "  • EKS Cluster + Managed Node Group"
+                echo "  • RDS MySQL Database (in same VPC)"
+                echo "  • S3 Storage Bucket"
                 echo "============================================"
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-credentials',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ],
+                    string(credentialsId: 'rds-password', variable: 'TF_VAR_db_password')
+                ]) {
+                    sh """
+                        # Install Terraform if not present
+                        if ! command -v terraform &> /dev/null; then
+                            echo "Installing Terraform..."
+                            wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+                            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com \$(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+                            apt-get update -qq && apt-get install -y terraform
+                        fi
+
+                        cd ${INFRA_DIR}
+                        terraform init
+                        terraform apply -auto-approve
+
+                        # Export live RDS endpoint and EKS cluster name
+                        NEW_RDS_HOST=\$(terraform output -raw rds_address 2>/dev/null || echo "")
+                        NEW_CLUSTER_NAME=\$(terraform output -raw eks_cluster_name 2>/dev/null || echo "")
+
+                        if [ -n "\$NEW_RDS_HOST" ]; then
+                            echo "RDS_HOST=\$NEW_RDS_HOST" > ../infra_outputs.env
+                        fi
+                        if [ -n "\$NEW_CLUSTER_NAME" ]; then
+                            echo "EKS_CLUSTER_NAME=\$NEW_CLUSTER_NAME" >> ../infra_outputs.env
+                        fi
+
+                        echo "✅ Entire Infrastructure Created Successfully!"
+                    """
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // STAGE 3: Build Docker Image
+        // ──────────────────────────────────────────────────────────────
+        stage('3. Build Docker Image') {
+            steps {
+                echo "Building Docker image: ${DOCKER_VERSIONED}..."
+                sh """
+                    docker build --no-cache \\
+                        -t ${DOCKER_VERSIONED} \\
+                        -t ${DOCKER_LATEST} \\
+                        .
+                """
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // STAGE 4: Trivy Security Scan
+        // ──────────────────────────────────────────────────────────────
+        stage('4. Trivy Security Vulnerability Scan') {
+            steps {
+                echo "Scanning image for vulnerabilities..."
+                sh """
+                    if ! command -v trivy &> /dev/null; then
+                        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
+                        echo "deb https://aquasecurity.github.io/trivy-repo/deb \$(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list
+                        apt-get update -qq && apt-get install -y trivy
+                    fi
+
+                    trivy image \\
+                        --ignore-unfixed \\
+                        --severity HIGH,CRITICAL \\
+                        --format table \\
+                        --output trivy-report.txt \\
+                        ${DOCKER_LATEST}
+
+                    cat trivy-report.txt
+
+                    CRITICAL_COUNT=\$(trivy image --ignore-unfixed --severity CRITICAL \\
+                        --format json ${DOCKER_LATEST} 2>/dev/null | \\
+                        python3 -c "import json,sys; d=json.load(sys.stdin); \\
+                        print(sum(len([v for v in (r.get('Vulnerabilities') or []) \\
+                        if v.get('Severity')=='CRITICAL']) \\
+                        for r in (d.get('Results') or [])))" 2>/dev/null || echo 0)
+
+                    if [ "\$CRITICAL_COUNT" -gt "0" ]; then
+                        echo "❌ Critical vulnerabilities detected!"
+                        exit 1
+                    fi
+
+                    echo "✅ Scan passed with 0 critical vulnerabilities!"
+                """
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'trivy-report.txt', allowEmptyArchive: true
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // STAGE 5: Push to Docker Hub
+        // ──────────────────────────────────────────────────────────────
+        stage('5. Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+                        docker push ${DOCKER_VERSIONED}
+                        docker push ${DOCKER_LATEST}
+                        docker logout
+                        echo "✅ Image pushed to Docker Hub!"
+                    """
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // STAGE 6: Deploy Application to 2-Tier Architecture
+        // ──────────────────────────────────────────────────────────────
+        stage('6. Deploy to EKS (2-Tier: App + RDS)') {
+            steps {
+                echo "Deploying application to EKS..."
                 withCredentials([
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
@@ -279,10 +246,22 @@ pipeline {
                         export AWS_SECRET_ACCESS_KEY=\$AWS_SECRET_ACCESS_KEY
                         export AWS_DEFAULT_REGION=${AWS_REGION}
 
-                        # Reconnect kubectl to EKS
-                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                        # Check if dynamic outputs exist from Terraform
+                        TARGET_RDS="${DB_HOST}"
+                        TARGET_CLUSTER="${EKS_CLUSTER_NAME}"
+                        if [ -f "infra_outputs.env" ]; then
+                            source infra_outputs.env
+                            [ -n "\$RDS_HOST" ] && TARGET_RDS="\$RDS_HOST"
+                            [ -n "\$EKS_CLUSTER_NAME" ] && TARGET_CLUSTER="\$EKS_CLUSTER_NAME"
+                        fi
 
-                        # ── Tier 2: ConfigMap (non-sensitive DB config) ──
+                        echo "Target EKS Cluster: \$TARGET_CLUSTER"
+                        echo "Target RDS Host   : \$TARGET_RDS"
+
+                        # Ensure kubectl is configured
+                        aws eks update-kubeconfig --region ${AWS_REGION} --name \$TARGET_CLUSTER
+
+                        # Tier 2: ConfigMap (Database Connection)
                         kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -290,44 +269,38 @@ metadata:
   name: college-app-config
 data:
   FLASK_ENV: "development"
-  DB_HOST: "${DB_HOST}"
+  DB_HOST: "\$TARGET_RDS"
   DB_PORT: "${DB_PORT}"
   DB_NAME: "${DB_NAME}"
   DB_USER: "${DB_USER}"
   INITIAL_ADMIN_EMAIL: "admin@college.edu"
 EOF
 
-                        # ── Tier 2: Secret (sensitive credentials) ──
+                        # Tier 2: Secret (Database Credentials)
                         kubectl create secret generic college-app-secret \\
                             --from-literal=DB_PASSWORD="\$RDS_PASSWORD" \\
                             --from-literal=SECRET_KEY="\$(openssl rand -hex 32)" \\
                             --from-literal=INITIAL_ADMIN_PASSWORD="AdminPassword123!" \\
                             --dry-run=client -o yaml | kubectl apply -f -
 
-                        # ── Tier 1: Deployment — update image to latest build ──
+                        # Tier 1: Frontend/App Deployment
                         kubectl apply -f ${K8S_DIR}/deployment.yaml
+                        kubectl set image deployment/${APP_NAME} ${APP_NAME}=${DOCKER_VERSIONED}
 
-                        # Update the image to the new versioned tag
-                        kubectl set image deployment/${APP_NAME} \\
-                            ${APP_NAME}=${DOCKER_VERSIONED}
-
-                        # ── Tier 1: Service — AWS Load Balancer ──
+                        # Tier 1: Service (Load Balancer)
                         kubectl apply -f ${K8S_DIR}/service.yaml
 
-                        echo "✅ All Kubernetes resources applied!"
+                        echo "✅ Deployment updated successfully!"
                     """
                 }
             }
         }
 
         // ──────────────────────────────────────────────────────────────
-        // STAGE 7: Verify Deployment
+        // STAGE 7: Verify Health & Connectivity
         // ──────────────────────────────────────────────────────────────
-        stage('7. Verify Deployment') {
+        stage('7. Verify 2-Tier Health') {
             steps {
-                echo "============================================"
-                echo "  Verifying deployment health..."
-                echo "============================================"
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials',
@@ -339,85 +312,37 @@ EOF
                         export AWS_SECRET_ACCESS_KEY=\$AWS_SECRET_ACCESS_KEY
                         export AWS_DEFAULT_REGION=${AWS_REGION}
 
-                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                        TARGET_CLUSTER="${EKS_CLUSTER_NAME}"
+                        if [ -f "infra_outputs.env" ]; then
+                            source infra_outputs.env
+                            [ -n "\$EKS_CLUSTER_NAME" ] && TARGET_CLUSTER="\$EKS_CLUSTER_NAME"
+                        fi
 
-                        # Wait for rollout to complete (max 5 minutes)
-                        echo "Waiting for rollout to complete..."
+                        aws eks update-kubeconfig --region ${AWS_REGION} --name \$TARGET_CLUSTER
+
+                        echo "Waiting for rollout..."
                         kubectl rollout status deployment/${APP_NAME} --timeout=5m
 
                         echo "── Pod Status ──"
                         kubectl get pods -o wide
 
-                        echo "── Service & Load Balancer ──"
-                        kubectl get svc college-app-service
-
-                        # Get the Load Balancer URL
-                        LB_URL=\$(kubectl get svc college-app-service \\
-                            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
-
-                        if [ "\$LB_URL" != "pending" ] && [ -n "\$LB_URL" ]; then
-                            echo ""
-                            echo "✅ Application is LIVE at:"
-                            echo "   http://\${LB_URL}"
-                            echo "   http://\${LB_URL}/health"
-
-                            # Test health endpoint (retry 5 times)
-                            for i in 1 2 3 4 5; do
-                                HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" \\
-                                    http://\${LB_URL}/health 2>/dev/null || echo "000")
-                                if [ "\$HTTP_CODE" = "200" ]; then
-                                    echo "✅ Health check PASSED — HTTP 200"
-                                    break
-                                fi
-                                echo "Attempt \$i — HTTP \$HTTP_CODE — retrying in 15s..."
-                                sleep 15
-                            done
-                        else
-                            echo "⚠️  Load Balancer still provisioning — check AWS Console in 2 minutes."
-                            echo "    kubectl get svc college-app-service"
+                        LB_URL=\$(kubectl get svc college-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+                        if [ -n "\$LB_URL" ]; then
+                            echo "✅ Application Live at: http://\${LB_URL}"
+                            echo "✅ Health Endpoint    : http://\${LB_URL}/health"
                         fi
-
-                        echo ""
-                        echo "══════════════════════════════════════"
-                        echo "  2-TIER ARCHITECTURE STATUS"
-                        echo "══════════════════════════════════════"
-                        echo "  Tier 1 (App)  : Flask Pods on EKS — see above"
-                        echo "  Tier 2 (DB)   : RDS MySQL — ${DB_HOST}"
-                        echo "  Image Deployed: ${DOCKER_VERSIONED}"
-                        echo "  Build Number  : ${BUILD_NUMBER}"
-                        echo "══════════════════════════════════════"
                     """
                 }
             }
         }
     }
 
-    // ── Post-build actions ────────────────────────────────────────────
     post {
-        success {
-            echo """
-╔══════════════════════════════════════╗
-║   ✅  PIPELINE SUCCEEDED             ║
-║   Build #${BUILD_NUMBER} deployed!   ║
-╚══════════════════════════════════════╝
-            """
-        }
-        failure {
-            echo """
-╔══════════════════════════════════════╗
-║   ❌  PIPELINE FAILED                ║
-║   Build #${BUILD_NUMBER} failed.     ║
-║   Check logs above for details.      ║
-╚══════════════════════════════════════╝
-            """
-            // Optional: clean up dangling images on failure
-            sh 'docker image prune -f || true'
-        }
         always {
-            echo "Cleaning up Docker images from Jenkins server..."
             sh """
                 docker rmi ${DOCKER_VERSIONED} || true
                 docker rmi ${DOCKER_LATEST} || true
+                rm -f infra_outputs.env || true
             """
         }
     }
