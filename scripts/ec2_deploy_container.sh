@@ -28,7 +28,15 @@ fi
 
 RDS_PASS_DECODED=$(printf '%s' "$RDS_PASS_B64" | base64 -d)
 
-sudo docker pull "$DOCKER_VERSIONED"
+if [ -f /tmp/app-image.tar.gz ]; then
+    echo "Loading Docker image transferred from Jenkins (no Docker Hub required)..."
+    sudo docker load -i /tmp/app-image.tar.gz
+    rm -f /tmp/app-image.tar.gz
+else
+    echo "Error: /tmp/app-image.tar.gz not found on EC2."
+    exit 1
+fi
+
 sudo docker tag "$DOCKER_VERSIONED" "$DOCKER_LATEST"
 sudo docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
@@ -51,5 +59,10 @@ sudo docker run -d \
   "$DOCKER_VERSIONED"
 
 sleep 5
-sudo docker exec "$CONTAINER_NAME" python database.py
+for i in 1 2 3; do
+    if sudo docker exec "$CONTAINER_NAME" python database.py; then
+        break
+    fi
+    sleep 3
+done
 sudo docker exec "$CONTAINER_NAME" python -c "import boto3, os; boto3.client('s3', region_name=os.environ['AWS_REGION']).head_bucket(Bucket=os.environ['S3_BUCKET_NAME']); print('S3 connection verified!')"

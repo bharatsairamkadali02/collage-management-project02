@@ -7,7 +7,6 @@
 // ══════════════════════════════════════════════════════════════════════
 //
 // JENKINS CREDENTIALS REQUIRED (Manage Jenkins → Credentials):
-//   dockerhub-creds   → Username/Password  (Docker Hub login)
 //   aws-credentials   → AWS Credentials    (IAM Access Key + Secret Key)
 //   rds-password      → Secret text        (RDS MySQL password, 8-41 ASCII chars, no / @ " space)
 //   ec2-ssh-key       → SSH Username with private key (Username: ubuntu + .pem key)
@@ -225,28 +224,7 @@ pipeline {
             }
         }
 
-        stage('6. Push to Docker Hub') {
-            when {
-                expression { return params.DESTROY_INFRA == false }
-            }
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                        set -e
-                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
-                        docker push ${DOCKER_VERSIONED}
-                        docker push ${DOCKER_LATEST}
-                        docker logout
-                    """
-                }
-            }
-        }
-
-        stage('7. Deploy & Connect Container on EC2 (RDS + S3)') {
+        stage('6. Deploy & Connect Container on EC2 (RDS + S3)') {
             when {
                 expression { return params.DESTROY_INFRA == false }
             }
@@ -296,6 +274,13 @@ pipeline {
                             sleep 5
                         done
 
+                        # Transfer Trivy-verified image directly to EC2 via SCP (no Docker Hub push)
+                        IMG_TAR="/tmp/app-image-${BUILD_NUMBER}.tar.gz"
+                        echo "Saving and transferring Docker image directly to EC2..."
+                        docker save "${DOCKER_VERSIONED}" | gzip > "\${IMG_TAR}"
+                        scp -o StrictHostKeyChecking=no -i "\$SSH_KEY_FILE" "\${IMG_TAR}" "\${SSH_USER}@\${TARGET_EC2}:/tmp/app-image.tar.gz"
+                        rm -f "\${IMG_TAR}"
+
                         SECRET_KEY_VAL=\$(openssl rand -hex 32)
                         RDS_PASS_B64=\$(printf '%s' "\$RDS_PASSWORD" | base64 | tr -d '\\n')
 
@@ -330,7 +315,7 @@ pipeline {
             sh """
                 docker rmi ${DOCKER_VERSIONED} 2>/dev/null || true
                 docker rmi ${DOCKER_LATEST} 2>/dev/null || true
-                rm -f infra_outputs.env 2>/dev/null || true
+                rm -f infra_outputs.env "/tmp/app-image-${BUILD_NUMBER}.tar.gz" 2>/dev/null || true
             """
         }
     }
