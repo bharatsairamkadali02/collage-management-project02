@@ -1,12 +1,11 @@
 # Secrets and local environment
 .env
 **/.env
-terraform/terraform.tfvars
-terraform/.terraform/
-terraform/terraform.tfstate
-terraform/terraform.tfstate.backup
-terraform/*.tfstate*
-terraform/crash.log
+**/terraform.tfvars
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
 
 # Python
 __pycache__/

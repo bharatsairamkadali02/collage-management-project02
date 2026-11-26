@@ -139,15 +139,19 @@ class ProductionConfig(Config):
     @classmethod
     def validate(cls) -> None:
         """Raise RuntimeError if critical production variables are missing."""
-        required = [
-            "SECRET_KEY",
-            "DATABASE_HOST",
-            "DATABASE_NAME",
-            "DATABASE_USER",
-            "DATABASE_PASSWORD",
-            "S3_BUCKET_NAME",
+        required_groups = [
+            ("SECRET_KEY",),
+            ("DATABASE_HOST", "DB_HOST"),
+            ("DATABASE_NAME", "DB_NAME"),
+            ("DATABASE_USER", "DB_USER"),
+            ("DATABASE_PASSWORD", "DB_PASSWORD"),
+            ("S3_BUCKET_NAME",),
         ]
-        missing = [var for var in required if not os.environ.get(var)]
+        missing = [
+            group[0]
+            for group in required_groups
+            if not any(os.environ.get(var) for var in group)
+        ]
         if missing:
             raise RuntimeError(
                 f"Missing required production environment variables: {missing}"

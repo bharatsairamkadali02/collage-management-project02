@@ -1,3 +1,7 @@
+###############################################################################
+# Input Variables for VPC, EC2, RDS MySQL, and S3 Infrastructure
+###############################################################################
+
 variable "aws_region" {
   description = "AWS region to deploy resources"
   type        = string
@@ -5,73 +9,67 @@ variable "aws_region" {
 }
 
 variable "project_name" {
-  description = "Project name prefix for resources"
+  description = "Project name prefix for AWS resources"
   type        = string
-  default     = "college-management"
+  default     = "college-app"
 }
+
+# -----------------------------------------------------------------------------
+# Networking (VPC, Subnets)
+# -----------------------------------------------------------------------------
 
 variable "vpc_cidr" {
-  description = "VPC CIDR block"
+  description = "CIDR block for the new VPC"
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "10.10.0.0/16"
 }
 
-variable "availability_zones" {
-  description = "Availability zones to use"
-  type        = list(string)
-  default     = ["ap-south-1a", "ap-south-1b"]
-}
-
-variable "public_subnets" {
-  description = "Public subnet CIDRs (for Load Balancers)"
-  type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24"]
-}
-
-variable "eks_private_subnets" {
-  description = "Private subnet CIDRs for EKS worker nodes"
-  type        = list(string)
-  default     = ["10.0.10.0/24", "10.0.20.0/24"]
-}
-
-variable "rds_private_subnets" {
-  description = "Private subnet CIDRs for RDS MySQL"
-  type        = list(string)
-  default     = ["10.0.30.0/24", "10.0.40.0/24"]
-}
-
-variable "eks_cluster_name" {
-  description = "Name of the EKS Cluster"
+variable "public_subnet_cidr" {
+  description = "Public subnet CIDR for the EC2 server (ap-south-1a)"
   type        = string
-  default     = "my-eks-cluster"
+  default     = "10.10.1.0/24"
 }
 
-variable "node_instance_type" {
-  description = "EC2 instance type for EKS worker nodes"
+variable "private_subnet_az1_cidr" {
+  description = "Private subnet CIDR 1 for RDS MySQL (ap-south-1a)"
   type        = string
-  default     = "t3.medium"
+  default     = "10.10.2.0/24"
 }
 
-variable "node_desired_size" {
-  description = "Desired number of worker nodes"
-  type        = number
-  default     = 2
+variable "private_subnet_az2_cidr" {
+  description = "Private subnet CIDR 2 for RDS MySQL (ap-south-1b)"
+  type        = string
+  default     = "10.10.3.0/24"
 }
 
-variable "node_min_size" {
-  description = "Minimum number of worker nodes"
-  type        = number
-  default     = 1
+# -----------------------------------------------------------------------------
+# EC2 Application Server
+# -----------------------------------------------------------------------------
+
+variable "ec2_instance_type" {
+  description = "EC2 instance type for running Docker build & container"
+  type        = string
+  default     = "t3.small"
 }
 
-variable "node_max_size" {
-  description = "Maximum number of worker nodes"
-  type        = number
-  default     = 3
+variable "key_pair_name" {
+  description = "Existing EC2 Key Pair name in AWS region for SSH access"
+  type        = string
+  default     = "laptopkeymumhp02"
 }
+
+variable "allowed_ssh_cidr" {
+  description = "CIDR allowed to SSH into EC2 (restrict to your IP/32 in production)"
+  type        = string
+  default     = "0.0.0.0/0"
+}
+
+# -----------------------------------------------------------------------------
+# RDS MySQL Database
+# -----------------------------------------------------------------------------
 
 variable "db_name" {
-  description = "MySQL database name"
+  description = "Initial MySQL database name"
   type        = string
   default     = "college_management"
 }
@@ -83,10 +81,14 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "Master password for RDS MySQL"
+  description = "Master password for RDS MySQL (8-41 ASCII chars, excluding /, @, quotes, spaces)"
   type        = string
   sensitive   = true
-  default     = "AdminPassword123#"
+
+  validation {
+    condition     = length(var.db_password) >= 8 && length(var.db_password) <= 41 && can(regex("^[!-~]+$", var.db_password)) && !can(regex("[/@\" ]", var.db_password))
+    error_message = "db_password must be 8-41 printable ASCII characters and must not contain /, @, double quotes, or spaces."
+  }
 }
 
 variable "db_instance_class" {
@@ -95,8 +97,12 @@ variable "db_instance_class" {
   default     = "db.t3.micro"
 }
 
-variable "s3_bucket_name" {
-  description = "Name of the S3 bucket for file uploads"
+# -----------------------------------------------------------------------------
+# S3 Storage
+# -----------------------------------------------------------------------------
+
+variable "s3_bucket_prefix" {
+  description = "Prefix for globally unique S3 bucket name (random hex suffix is appended)"
   type        = string
-  default     = "college-management-app-bucket"
+  default     = "college-app-media"
 }
