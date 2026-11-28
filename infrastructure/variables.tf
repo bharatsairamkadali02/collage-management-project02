@@ -47,9 +47,9 @@ variable "private_subnet_az2_cidr" {
 # -----------------------------------------------------------------------------
 
 variable "ec2_instance_type" {
-  description = "EC2 instance type for running Docker + Minikube Kubernetes"
+  description = "EC2 instance type for running Docker + Minikube Kubernetes (c7i-flex.large is Free Tier eligible with 2 vCPU / 4 GB RAM)"
   type        = string
-  default     = "t3.medium"
+  default     = "c7i-flex.large"
 }
 
 variable "key_pair_name" {
