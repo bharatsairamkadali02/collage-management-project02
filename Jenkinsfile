@@ -265,27 +265,49 @@ pipeline {
                         echo "Target RDS : \$TARGET_RDS"
                         echo "Target S3  : \$TARGET_S3"
 
+                        # Normalize CRLF and ensure trailing newline on SSH private key
+                        CLEAN_KEY="/tmp/ec2_key_${BUILD_NUMBER}.pem"
+                        tr -d '\\r' < "\$SSH_KEY_FILE" > "\${CLEAN_KEY}"
+                        printf '\\n' >> "\${CLEAN_KEY}"
+                        chmod 600 "\${CLEAN_KEY}"
+
+                        if ! ssh-keygen -y -P "" -f "\${CLEAN_KEY}" >/dev/null 2>&1; then
+                            echo "ERROR: Invalid private key in Jenkins credential 'ec2-ssh-key'."
+                            echo "Paste the full contents of laptopkeymumhp02.pem (PEM/OpenSSH format, not .ppk)."
+                            rm -f "\${CLEAN_KEY}"
+                            exit 1
+                        fi
+
                         # Wait for SSH on newly launched EC2
                         echo "Waiting for SSH on \${TARGET_EC2}..."
+                        SSH_OK=0
                         for i in \$(seq 1 24); do
-                            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "\$SSH_KEY_FILE" "\${SSH_USER}@\${TARGET_EC2}" "echo ssh-ready" >/dev/null 2>&1; then
+                            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "\${CLEAN_KEY}" "\${SSH_USER}@\${TARGET_EC2}" "echo ssh-ready" >/dev/null 2>&1; then
+                                SSH_OK=1
                                 break
                             fi
                             sleep 5
                         done
 
+                        if [ "\$SSH_OK" -ne 1 ]; then
+                            echo "ERROR: Could not connect to \${SSH_USER}@\${TARGET_EC2} via SSH."
+                            rm -f "\${CLEAN_KEY}"
+                            exit 1
+                        fi
+
                         # Transfer Trivy-verified image directly to EC2 via SCP (no Docker Hub push)
                         IMG_TAR="/tmp/app-image-${BUILD_NUMBER}.tar.gz"
                         echo "Saving and transferring Docker image directly to EC2..."
                         docker save "${DOCKER_VERSIONED}" | gzip > "\${IMG_TAR}"
-                        scp -o StrictHostKeyChecking=no -i "\$SSH_KEY_FILE" "\${IMG_TAR}" "\${SSH_USER}@\${TARGET_EC2}:/tmp/app-image.tar.gz"
+                        scp -o StrictHostKeyChecking=no -i "\${CLEAN_KEY}" "\${IMG_TAR}" "\${SSH_USER}@\${TARGET_EC2}:/tmp/app-image.tar.gz"
                         rm -f "\${IMG_TAR}"
 
                         SECRET_KEY_VAL=\$(openssl rand -hex 32)
                         RDS_PASS_B64=\$(printf '%s' "\$RDS_PASSWORD" | base64 | tr -d '\\n')
 
-                        ssh -o StrictHostKeyChecking=no -i "\$SSH_KEY_FILE" "\${SSH_USER}@\${TARGET_EC2}" \\
+                        ssh -o StrictHostKeyChecking=no -i "\${CLEAN_KEY}" "\${SSH_USER}@\${TARGET_EC2}" \\
                             "bash -s -- '${DOCKER_VERSIONED}' '${DOCKER_LATEST}' '${CONTAINER_NAME}' '\${TARGET_RDS}' '${DB_PORT}' '${DB_NAME}' '${DB_USER}' '${AWS_REGION}' '\${TARGET_S3}' '\${SECRET_KEY_VAL}' '\${RDS_PASS_B64}'" < scripts/ec2_deploy_container.sh
+                        rm -f "\${CLEAN_KEY}"
 
                         echo "Verifying /health endpoint on http://\${TARGET_EC2}:8080/health ..."
                         HEALTHY=0
@@ -315,7 +337,7 @@ pipeline {
             sh """
                 docker rmi ${DOCKER_VERSIONED} 2>/dev/null || true
                 docker rmi ${DOCKER_LATEST} 2>/dev/null || true
-                rm -f infra_outputs.env "/tmp/app-image-${BUILD_NUMBER}.tar.gz" 2>/dev/null || true
+                rm -f infra_outputs.env "/tmp/app-image-${BUILD_NUMBER}.tar.gz" "/tmp/ec2_key_${BUILD_NUMBER}.pem" 2>/dev/null || true
             """
         }
     }
