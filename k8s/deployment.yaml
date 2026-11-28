@@ -31,7 +31,7 @@ spec:
       containers:
         - name: college-app
           image: kadalibharatsairam01/college-management:latest
-          imagePullPolicy: Always  # Always pull latest image on pod start
+          imagePullPolicy: IfNotPresent  # Uses local Minikube-loaded image without Docker Hub pull
 
           ports:
             - containerPort: 5000  # Port Gunicorn listens on INSIDE the container
@@ -60,13 +60,13 @@ spec:
                   key: INITIAL_ADMIN_PASSWORD
 
           # ── Resource Limits ──
-          # Prevents one pod from consuming all EC2 memory/CPU
+          # Sized cleanly for 2 replicas on EC2 Minikube
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "250m"
+              memory: "192Mi"
+              cpu: "200m"
             limits:
-              memory: "512Mi"
+              memory: "448Mi"
               cpu: "500m"
 
           # ── Readiness Probe ──

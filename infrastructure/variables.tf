@@ -47,9 +47,9 @@ variable "private_subnet_az2_cidr" {
 # -----------------------------------------------------------------------------
 
 variable "ec2_instance_type" {
-  description = "EC2 instance type for running Docker build & container"
+  description = "EC2 instance type for running Docker + Minikube Kubernetes"
   type        = string
-  default     = "t3.small"
+  default     = "t3.medium"
 }
 
 variable "key_pair_name" {

@@ -110,11 +110,11 @@ resource "aws_instance" "app_server" {
     }
   }
 
-  # hop_limit = 2 allows Docker containers on EC2 to fetch IAM role credentials for S3 via IMDSv2
+  # hop_limit = 4 allows Pods inside Minikube (Docker driver) on EC2 to fetch IAM role credentials for S3 via IMDSv2
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 2
+    http_put_response_hop_limit = 4
   }
 
   tags = {

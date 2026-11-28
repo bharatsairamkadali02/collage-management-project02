@@ -1,9 +1,8 @@
 // ══════════════════════════════════════════════════════════════════════
-//  EduManage Pro — Jenkins CI/CD Pipeline (EC2 + Docker + RDS MySQL + S3)
+//  EduManage Pro — Jenkins CI/CD Pipeline (EC2 + Minikube + RDS MySQL + S3)
 //  Repo   : https://github.com/bharatsairamkadali02/collage-management-project02.git
-//  Image  : kadalibharatsairam01/college-management
-//  Infra  : AWS VPC, Subnets, IGW, Route Tables, SGs, EC2, RDS MySQL, S3
-//           (No Kubernetes / No EKS)
+//  Image  : kadalibharatsairam01/college-management (local Minikube load, no Docker Hub push)
+//  Infra  : AWS VPC, Subnets, IGW, Route Tables, SGs, EC2 (Minikube), RDS MySQL, S3
 // ══════════════════════════════════════════════════════════════════════
 //
 // JENKINS CREDENTIALS REQUIRED (Manage Jenkins → Credentials):
@@ -224,7 +223,7 @@ pipeline {
             }
         }
 
-        stage('6. Deploy & Connect Container on EC2 (RDS + S3)') {
+        stage('6. Deploy to Minikube on EC2 (RDS + S3)') {
             when {
                 expression { return params.DESTROY_INFRA == false }
             }
@@ -295,18 +294,36 @@ pipeline {
                             exit 1
                         fi
 
-                        # Transfer Trivy-verified image directly to EC2 via SCP (no Docker Hub push)
+                        # Wait for EC2 user_data bootstrap (Docker, kubectl, Minikube, Nginx) before running Minikube
+                        echo "Waiting for EC2 bootstrap (Docker, Minikube, kubectl, Nginx) to complete..."
+                        BOOT_OK=0
+                        for i in \$(seq 1 72); do
+                            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "\${CLEAN_KEY}" "\${SSH_USER}@\${TARGET_EC2}" "[ -f /var/log/bootstrap-complete.log ]" >/dev/null 2>&1; then
+                                BOOT_OK=1
+                                break
+                            fi
+                            sleep 5
+                        done
+
+                        if [ "\$BOOT_OK" -ne 1 ]; then
+                            echo "ERROR: EC2 bootstrap did not finish within 6 minutes. Check /var/log/user-data.log on EC2."
+                            rm -f "\${CLEAN_KEY}"
+                            exit 1
+                        fi
+
+                        # Transfer Trivy-verified image & Kubernetes manifests directly to EC2 via SCP (no Docker Hub push)
                         IMG_TAR="/tmp/app-image-${BUILD_NUMBER}.tar.gz"
-                        echo "Saving and transferring Docker image directly to EC2..."
+                        echo "Saving and transferring Docker image and k8s manifests directly to EC2..."
                         docker save "${DOCKER_VERSIONED}" | gzip > "\${IMG_TAR}"
                         scp -o StrictHostKeyChecking=no -i "\${CLEAN_KEY}" "\${IMG_TAR}" "\${SSH_USER}@\${TARGET_EC2}:/tmp/app-image.tar.gz"
+                        scp -o StrictHostKeyChecking=no -i "\${CLEAN_KEY}" -r k8s "\${SSH_USER}@\${TARGET_EC2}:/tmp/"
                         rm -f "\${IMG_TAR}"
 
                         SECRET_KEY_VAL=\$(openssl rand -hex 32)
                         RDS_PASS_B64=\$(printf '%s' "\$RDS_PASSWORD" | base64 | tr -d '\\n')
 
                         ssh -o StrictHostKeyChecking=no -i "\${CLEAN_KEY}" "\${SSH_USER}@\${TARGET_EC2}" \\
-                            "bash -s -- '${DOCKER_VERSIONED}' '${DOCKER_LATEST}' '${CONTAINER_NAME}' '\${TARGET_RDS}' '${DB_PORT}' '${DB_NAME}' '${DB_USER}' '${AWS_REGION}' '\${TARGET_S3}' '\${SECRET_KEY_VAL}' '\${RDS_PASS_B64}'" < scripts/ec2_deploy_container.sh
+                            "bash -s -- '${DOCKER_VERSIONED}' '${DOCKER_LATEST}' '${CONTAINER_NAME}' '\${TARGET_RDS}' '${DB_PORT}' '${DB_NAME}' '${DB_USER}' '${AWS_REGION}' '\${TARGET_S3}' '\${SECRET_KEY_VAL}' '\${RDS_PASS_B64}'" < scripts/ec2_deploy_minikube.sh
                         rm -f "\${CLEAN_KEY}"
 
                         echo "Verifying /health endpoint on http://\${TARGET_EC2}:8080/health ..."
@@ -314,7 +331,9 @@ pipeline {
                         for i in \$(seq 1 12); do
                             CODE=\$(curl -s -o /dev/null -w "%{http_code}" "http://\${TARGET_EC2}:8080/health" || echo "000")
                             if [ "\$CODE" = "200" ]; then
-                                echo "Application is LIVE and healthy at http://\${TARGET_EC2}:8080"
+                                echo "Application is LIVE and healthy on Minikube!"
+                                echo "  URL (port 80)   : http://\${TARGET_EC2}"
+                                echo "  URL (port 8080) : http://\${TARGET_EC2}:8080"
                                 HEALTHY=1
                                 break
                             fi
